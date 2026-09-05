@@ -1,0 +1,2423 @@
+{
+  "schema_version": "1.0",
+  "characters": [
+    {
+      "id": "acheron",
+      "name": "Acheron Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "lightning",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1125.0,
+        "atk": 698.0,
+        "def": 436.0,
+        "spd": 101.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.24,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "aglaea",
+      "name": "Aglaea Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "lightning",
+      "path": "Remembrance",
+      "base_stats": {
+        "hp": 1241.0,
+        "atk": 698.0,
+        "def": 485.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "anaxa",
+      "name": "Anaxa Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 970.0,
+        "atk": 756.0,
+        "def": 557.0,
+        "spd": 97.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "archer",
+      "name": "Archer Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 1164.0,
+        "atk": 620.0,
+        "def": 485.0,
+        "spd": 105.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.067,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "argenti",
+      "name": "Argenti Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1047.0,
+        "atk": 737.0,
+        "def": 363.0,
+        "spd": 103.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "arlan",
+      "name": "Arlan Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "lightning",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1199.0,
+        "atk": 599.0,
+        "def": 330.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.18,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "ashveil",
+      "name": "Ashveil Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "lightning",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 852.0,
+        "atk": 771.0,
+        "def": 382.0,
+        "spd": 106.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "asta",
+      "name": "Asta Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "fire",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1023.0,
+        "atk": 511.0,
+        "def": 463.0,
+        "spd": 106.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.225,
+        "spd_pct": null,
+        "crit_rate_pct": 0.067,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "aventurine-waveflair",
+      "name": "Aventurine Waveflair Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Elation",
+      "base_stats": {
+        "hp": null,
+        "atk": null,
+        "def": null,
+        "spd": null,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "aventurine",
+      "name": "Aventurine Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Preservation",
+      "base_stats": {
+        "hp": 1203.0,
+        "atk": 446.0,
+        "def": 654.0,
+        "spd": 106.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.35,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "bailu",
+      "name": "Bailu Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "lightning",
+      "path": "Abundance",
+      "base_stats": {
+        "hp": 1319.0,
+        "atk": 562.0,
+        "def": 485.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.28,
+        "atk_pct": null,
+        "def_pct": 0.225,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "black-swan",
+      "name": "Black Swan Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1086.0,
+        "atk": 659.0,
+        "def": 485.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.1
+      }
+    },
+    {
+      "id": "blade-mortenax",
+      "name": "Mortenax Blade Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1359.0,
+        "atk": 543.0,
+        "def": 485.0,
+        "spd": 107.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "blade",
+      "name": "Blade Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1358.0,
+        "atk": 543.0,
+        "def": 485.0,
+        "spd": 97.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.28,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "boothill",
+      "name": "Boothill Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 1203.0,
+        "atk": 620.0,
+        "def": 436.0,
+        "spd": 107.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.373,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "bronya",
+      "name": "Bronya Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1241.0,
+        "atk": 582.0,
+        "def": 533.0,
+        "spd": 99.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.24,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "castorice",
+      "name": "Castorice Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Remembrance",
+      "base_stats": {
+        "hp": 1631.0,
+        "atk": 523.0,
+        "def": 485.0,
+        "spd": 95.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.187,
+        "crit_dmg_pct": 0.133,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "cerydra",
+      "name": "Cerydra Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1358.0,
+        "atk": 620.0,
+        "def": 485.0,
+        "spd": 99.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "cipher",
+      "name": "Cipher Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 931.0,
+        "atk": 640.0,
+        "def": 509.0,
+        "spd": 106.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.14,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.1
+      }
+    },
+    {
+      "id": "clara",
+      "name": "Clara Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1319.0,
+        "atk": 737.0,
+        "def": 485.0,
+        "spd": 90.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "cyrene",
+      "name": "Cyrene Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Remembrance",
+      "base_stats": {
+        "hp": 1396.0,
+        "atk": 446.0,
+        "def": 582.0,
+        "spd": 101.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.09,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "dan-heng-permansor-terrae",
+      "name": "Dan Heng • Permansor Terrae Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Preservation",
+      "base_stats": {
+        "hp": 1047.0,
+        "atk": 582.0,
+        "def": 776.0,
+        "spd": 97.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.225,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "dan-heng",
+      "name": "Dan Heng Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "wind",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 882.0,
+        "atk": 546.0,
+        "def": 396.0,
+        "spd": 110.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "dr-ratio",
+      "name": "Dr. Ratio Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 1047.0,
+        "atk": 776.0,
+        "def": 460.0,
+        "spd": 103.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "evanescia",
+      "name": "Evanescia Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Elation",
+      "base_stats": {
+        "hp": 1051.0,
+        "atk": 737.0,
+        "def": 460.0,
+        "spd": 104.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": 0.187,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "feixiao",
+      "name": "Feixiao Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 1051.0,
+        "atk": 601.0,
+        "def": 388.0,
+        "spd": 112.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "firefly",
+      "name": "Firefly Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 814.0,
+        "atk": 523.0,
+        "def": 776.0,
+        "spd": 104.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.373,
+        "effect_res_pct": 0.18,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "fu-xuan",
+      "name": "Fu Xuan Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Preservation",
+      "base_stats": {
+        "hp": 1474.0,
+        "atk": 465.0,
+        "def": 606.0,
+        "spd": 100.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.187,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "gallagher",
+      "name": "Gallagher Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "fire",
+      "path": "Abundance",
+      "base_stats": {
+        "hp": 1305.0,
+        "atk": 529.0,
+        "def": 441.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.133,
+        "effect_res_pct": 0.28,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "gepard",
+      "name": "Gepard Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Preservation",
+      "base_stats": {
+        "hp": 1397.0,
+        "atk": 543.0,
+        "def": 654.0,
+        "spd": 92.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.18,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "gilgamesh",
+      "name": "Gilgamesh Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "lightning",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1124.0,
+        "atk": 717.0,
+        "def": 509.0,
+        "spd": 97.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.187,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "guinaifen",
+      "name": "Guinaifen Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "fire",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 882.0,
+        "atk": 582.0,
+        "def": 441.0,
+        "spd": 106.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.24,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.1
+      }
+    },
+    {
+      "id": "hanya",
+      "name": "Hanya Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "physical",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 917.0,
+        "atk": 564.0,
+        "def": 352.0,
+        "spd": 110.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": 0.09,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "herta",
+      "name": "Herta Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "ice",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 952.0,
+        "atk": 582.0,
+        "def": 396.0,
+        "spd": 100.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.225,
+        "spd_pct": null,
+        "crit_rate_pct": 0.067,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "himeko-nova",
+      "name": "Himeko Nova Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1124.0,
+        "atk": 756.0,
+        "def": 485.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "himeko",
+      "name": "Himeko Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1047.0,
+        "atk": 756.0,
+        "def": 436.0,
+        "spd": 96.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "hook",
+      "name": "Hook Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "fire",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1340.0,
+        "atk": 617.0,
+        "def": 352.0,
+        "spd": 94.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.133,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "huohuo",
+      "name": "Huohuo Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Abundance",
+      "base_stats": {
+        "hp": 1358.0,
+        "atk": 601.0,
+        "def": 509.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.28,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.18,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "hyacine",
+      "name": "Hyacine Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Remembrance",
+      "base_stats": {
+        "hp": 1087.0,
+        "atk": 388.0,
+        "def": 630.0,
+        "spd": 110.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.14,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.18,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "hysilens",
+      "name": "Hysilens Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1205.0,
+        "atk": 601.0,
+        "def": 485.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": 0.14,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.1
+      }
+    },
+    {
+      "id": "imbibitor-lunae",
+      "name": "Dan Heng • Imbibitor Lunae Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1241.0,
+        "atk": 698.0,
+        "def": 363.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "jade",
+      "name": "Jade Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1086.0,
+        "atk": 659.0,
+        "def": 509.0,
+        "spd": 103.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "jiaoqiu",
+      "name": "Jiaoqiu Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1358.0,
+        "atk": 601.0,
+        "def": 509.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.28
+      }
+    },
+    {
+      "id": "jing-yuan",
+      "name": "Jing Yuan Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "lightning",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1164.0,
+        "atk": 698.0,
+        "def": 485.0,
+        "spd": 99.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "jingliu",
+      "name": "Jingliu Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1435.0,
+        "atk": 679.0,
+        "def": 485.0,
+        "spd": 96.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.09,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "kafka",
+      "name": "Kafka Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "lightning",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1086.0,
+        "atk": 679.0,
+        "def": 485.0,
+        "spd": 100.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.18
+      }
+    },
+    {
+      "id": "lingsha",
+      "name": "Lingsha Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Abundance",
+      "base_stats": {
+        "hp": 1358.0,
+        "atk": 679.0,
+        "def": 436.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": 0.1,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.373,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "luka",
+      "name": "Luka Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "physical",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 917.0,
+        "atk": 582.0,
+        "def": 485.0,
+        "spd": 103.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.18
+      }
+    },
+    {
+      "id": "luocha",
+      "name": "Luocha Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Abundance",
+      "base_stats": {
+        "hp": 1280.0,
+        "atk": 756.0,
+        "def": 363.0,
+        "spd": 101.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "lynx",
+      "name": "Lynx Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "quantum",
+      "path": "Abundance",
+      "base_stats": {
+        "hp": 1058.0,
+        "atk": 493.0,
+        "def": 551.0,
+        "spd": 100.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.28,
+        "atk_pct": null,
+        "def_pct": 0.225,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "march-7th-evernight",
+      "name": "March 7th • Evernight Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Remembrance",
+      "base_stats": {
+        "hp": 1323.0,
+        "atk": 543.0,
+        "def": 582.0,
+        "spd": 99.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.187,
+        "crit_dmg_pct": 0.133,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "march-7th-swordmaster",
+      "name": "March 7th • The Hunt Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "imaginary",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 1058.0,
+        "atk": 564.0,
+        "def": 441.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.1,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.24,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "march-7th",
+      "name": "March 7th Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "ice",
+      "path": "Preservation",
+      "base_stats": {
+        "hp": 1058.0,
+        "atk": 511.0,
+        "def": 573.0,
+        "spd": 101.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.225,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "misha",
+      "name": "Misha Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "ice",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1270.0,
+        "atk": 599.0,
+        "def": 396.0,
+        "spd": 96.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.225,
+        "spd_pct": null,
+        "crit_rate_pct": 0.067,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "moze",
+      "name": "Moze Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "lightning",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 808.0,
+        "atk": 599.0,
+        "def": 352.0,
+        "spd": 111.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "mydei",
+      "name": "Mydei Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1552.0,
+        "atk": 426.0,
+        "def": 194.0,
+        "spd": 95.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "natasha",
+      "name": "Natasha Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "physical",
+      "path": "Abundance",
+      "base_stats": {
+        "hp": 1164.0,
+        "atk": 476.0,
+        "def": 507.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.28,
+        "atk_pct": null,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.18,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "pearl",
+      "name": "Pearl Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Elation",
+      "base_stats": {
+        "hp": null,
+        "atk": null,
+        "def": null,
+        "spd": null,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "pela",
+      "name": "Pela Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "ice",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 987.0,
+        "atk": 546.0,
+        "def": 463.0,
+        "spd": 105.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.1
+      }
+    },
+    {
+      "id": "phainon",
+      "name": "Phainon Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1433.0,
+        "atk": 582.0,
+        "def": 703.0,
+        "spd": 94.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "qingque",
+      "name": "Qingque Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "quantum",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1023.0,
+        "atk": 652.0,
+        "def": 441.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "rappa",
+      "name": "Rappa Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1087.0,
+        "atk": 717.0,
+        "def": 460.0,
+        "spd": 96.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": 0.09,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.133,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "rin-tohsaka",
+      "name": "Rin Tohsaka Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1051.0,
+        "atk": 698.0,
+        "def": 460.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "robin-summeretto",
+      "name": "Robin Summeretto Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Remembrance",
+      "base_stats": {
+        "hp": 1205.0,
+        "atk": 601.0,
+        "def": 485.0,
+        "spd": 98.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.14,
+        "crit_rate_pct": 0.067,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "robin",
+      "name": "Robin Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1280.0,
+        "atk": 640.0,
+        "def": 485.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "ruan-mei",
+      "name": "Ruan Mei Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1086.0,
+        "atk": 659.0,
+        "def": 485.0,
+        "spd": 104.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.225,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.373,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "saber",
+      "name": "Saber Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "wind",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1241.0,
+        "atk": 601.0,
+        "def": 654.0,
+        "spd": 101.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "sampo",
+      "name": "Sampo Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "wind",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1023.0,
+        "atk": 617.0,
+        "def": 396.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": 0.18
+      }
+    },
+    {
+      "id": "seele",
+      "name": "Seele Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 931.0,
+        "atk": 640.0,
+        "def": 363.0,
+        "spd": 115.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.24,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "serval",
+      "name": "Serval Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "lightning",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 917.0,
+        "atk": 652.0,
+        "def": 374.0,
+        "spd": 104.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.187,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": 0.18
+      }
+    },
+    {
+      "id": "silver-wolf-lv-999",
+      "name": "Silver Wolf • Lv. 999 Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Elation",
+      "base_stats": {
+        "hp": 1051.0,
+        "atk": 388.0,
+        "def": 654.0,
+        "spd": 110.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.09,
+        "crit_rate_pct": 0.187,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "silver-wolf",
+      "name": "Silver Wolf Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1047.0,
+        "atk": 640.0,
+        "def": 460.0,
+        "spd": 107.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": 0.18
+      }
+    },
+    {
+      "id": "sparkle",
+      "name": "Sparkle Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1397.0,
+        "atk": 523.0,
+        "def": 485.0,
+        "spd": 101.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.28,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.24,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "sparxie",
+      "name": "Sparxie Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Elation",
+      "base_stats": {
+        "hp": 1051.0,
+        "atk": 640.0,
+        "def": 460.0,
+        "spd": 107.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": 0.133,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "sunday",
+      "name": "Sunday Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1241.0,
+        "atk": 640.0,
+        "def": 533.0,
+        "spd": 96.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.18,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "sushang",
+      "name": "Sushang Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "physical",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 917.0,
+        "atk": 564.0,
+        "def": 418.0,
+        "spd": 107.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "the-dahlia",
+      "name": "The Dahlia Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1087.0,
+        "atk": 679.0,
+        "def": 606.0,
+        "spd": 96.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.373,
+        "effect_res_pct": 0.18,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "the-herta",
+      "name": "The Herta Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Erudition",
+      "base_stats": {
+        "hp": 1164.0,
+        "atk": 679.0,
+        "def": 485.0,
+        "spd": 99.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.18,
+        "def_pct": null,
+        "spd_pct": 0.05,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "tingyun-fugue",
+      "name": "Tingyun • Fugue Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1125.0,
+        "atk": 582.0,
+        "def": 557.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.14,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.24,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "tingyun",
+      "name": "Tingyun Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "lightning",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 846.0,
+        "atk": 529.0,
+        "def": 396.0,
+        "spd": 112.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": 0.225,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "topaz",
+      "name": "Topaz & Numby Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 931.0,
+        "atk": 620.0,
+        "def": 412.0,
+        "spd": 110.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "trailblazer-destruction",
+      "name": "Trailblazer • Destruction Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1203.0,
+        "atk": 620.0,
+        "def": 460.0,
+        "spd": 100.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": 0.28,
+        "def_pct": 0.125,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "trailblazer-elation",
+      "name": "Trailblazer • Elation Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "lightning",
+      "path": "Elation",
+      "base_stats": {
+        "hp": 1087.0,
+        "atk": 465.0,
+        "def": 630.0,
+        "spd": 106.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": 0.133,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "trailblazer-harmony",
+      "name": "Trailblazer • Harmony Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1086.0,
+        "atk": 446.0,
+        "def": 679.0,
+        "spd": 105.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.373,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "trailblazer-preservation",
+      "name": "Trailblazer • Preservation Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "fire",
+      "path": "Preservation",
+      "base_stats": {
+        "hp": 1241.0,
+        "atk": 601.0,
+        "def": 606.0,
+        "spd": 95.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.18,
+        "def_pct": 0.35,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "trailblazer-remembrance",
+      "name": "Trailblazer • Remembrance Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Remembrance",
+      "base_stats": {
+        "hp": 1047.0,
+        "atk": 543.0,
+        "def": 630.0,
+        "spd": 103.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.14,
+        "atk_pct": 0.14,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "tribbie",
+      "name": "Tribbie Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "quantum",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 1047.0,
+        "atk": 523.0,
+        "def": 727.0,
+        "spd": 96.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.12,
+        "crit_dmg_pct": 0.373,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "welt",
+      "name": "Welt Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "imaginary",
+      "path": "Nihility",
+      "base_stats": {
+        "hp": 1125.0,
+        "atk": 620.0,
+        "def": 509.0,
+        "spd": 102.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": 0.1,
+        "effect_hit_rate_pct": 0.28
+      }
+    },
+    {
+      "id": "xueyi",
+      "name": "Xueyi Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "quantum",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1058.0,
+        "atk": 599.0,
+        "def": 396.0,
+        "spd": 103.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": 0.373,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "yanqing",
+      "name": "Yanqing Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "ice",
+      "path": "Hunt",
+      "base_stats": {
+        "hp": 892.0,
+        "atk": 679.0,
+        "def": 412.0,
+        "spd": 109.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.1,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "yao-guang",
+      "name": "Yao Guang Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Elation",
+      "base_stats": {
+        "hp": 1242.0,
+        "atk": 465.0,
+        "def": 654.0,
+        "spd": 101.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": null,
+        "atk_pct": null,
+        "def_pct": null,
+        "spd_pct": 0.09,
+        "crit_rate_pct": 0.187,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "yukong",
+      "name": "Yukong Best Build Guide | Honkai: Star Rail",
+      "rarity": 4,
+      "element": "imaginary",
+      "path": "Harmony",
+      "base_stats": {
+        "hp": 917.0,
+        "atk": 599.0,
+        "def": 374.0,
+        "spd": 107.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": 0.1,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": null,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    },
+    {
+      "id": "yunli",
+      "name": "Yunli Best Build Guide | Honkai: Star Rail",
+      "rarity": 5,
+      "element": "physical",
+      "path": "Destruction",
+      "base_stats": {
+        "hp": 1359.0,
+        "atk": 679.0,
+        "def": 460.0,
+        "spd": 94.0,
+        "crit_rate": 0.05,
+        "crit_dmg": 0.5
+      },
+      "minor_trace_stats": {
+        "hp_pct": 0.18,
+        "atk_pct": 0.28,
+        "def_pct": null,
+        "spd_pct": null,
+        "crit_rate_pct": 0.067,
+        "crit_dmg_pct": null,
+        "break_effect_pct": null,
+        "effect_res_pct": null,
+        "effect_hit_rate_pct": null
+      }
+    }
+  ]
+}

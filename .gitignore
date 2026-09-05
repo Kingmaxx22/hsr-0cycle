@@ -1,0 +1,28 @@
+# CMake build output
+build/
+raylib/build/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln
+*.vcxproj.user
+
+# Compiled binaries
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+Thumbs.db
+.DS_Store
