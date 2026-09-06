@@ -120,43 +120,73 @@ double calculateDefenseMultiplier(
 // ============================================================================
 // SECTION 5: RESISTANCE MULTIPLIER CALCULATION IMPLEMENTATION
 // ============================================================================
-// RES Mult calculation based on enemy resistance and RES Penetration
+// RES Mult = 100% - (RES% - RES PEN%)
 //
-// Effective RES = Enemy RES - RES Penetration - RES Reduction
-// 
-// If Effective RES >= 0:
-//   RES Mult = 1 - Effective RES
-// If Effective RES < 0:
-//   RES Mult = 1 - (Effective RES / 2)
-//   (Negative resistance gives diminished returns)
+// Rules:
+// - Base enemy RES to all elements = 20%, UNLESS the enemy has an innate weakness or resistance.
+// - Enemy weak to the element -> RES = 0%.
+// - Enemy resistant to the element -> RES = 40%.
+// - RES is clamped between -100% (min) and 90% (max) before applying PEN.
+//
+// Effective RES = clamp(enemyBaseRES, -1.0, 0.9) - resPenetration
+// RES Mult = 1 - Effective RES, clamped to range [0.1, 2.0]
 
 double calculateResistanceMultiplier(const ResistanceMultiplierConfig& config) {
-    double enemyRES = config.enemyResistance;
-    double resPen = std::clamp(config.resPenetration, 0.0, 1.0);
-    double resRed = std::clamp(config.resReduction, 0.0, 1.0);
+    // Determine base RES based on resistance type
+    double enemyBaseRES = 0.20; // Default Neutral = 20%
     
-    // Calculate effective resistance after penetration and reduction
-    double effectiveRES = enemyRES - resPen - resRed;
-    
-    // Apply resistance multiplier formula
-    if (effectiveRES >= 0.0) {
-        // Positive resistance reduces damage
-        return 1.0 - effectiveRES;
-    } else {
-        // Negative resistance increases damage, but with diminished returns
-        return 1.0 - (effectiveRES / 2.0);
+    switch (config.resistanceType) {
+        case EnemyResistanceType::Weak:
+            enemyBaseRES = 0.0;   // Weak = 0%
+            break;
+        case EnemyResistanceType::Resistant:
+            enemyBaseRES = 0.40;  // Resistant = 40%
+            break;
+        case EnemyResistanceType::Neutral:
+        default:
+            enemyBaseRES = 0.20;  // Neutral = 20%
+            break;
     }
+    
+    // Clamp enemy RES between -100% and 90% before applying penetration
+    double clampedRES = std::clamp(enemyBaseRES, -1.0, 0.9);
+    
+    // Apply RES penetration
+    double effectiveRES = clampedRES - std::clamp(config.resPenetration, 0.0, 1.0);
+    
+    // Calculate RES Mult = 1 - Effective RES
+    double resMult = 1.0 - effectiveRES;
+    
+    // Clamp final multiplier to range [0.1, 2.0]
+    return std::clamp(resMult, 0.1, 2.0);
 }
 
 double calculateResistanceMultiplier(
-    double enemyResistance,
-    double resPenetration,
-    double resReduction) {
+    double enemyBaseRES,
+    double resPenetration) {
     
     ResistanceMultiplierConfig config;
-    config.enemyResistance = enemyResistance;
     config.resPenetration = resPenetration;
-    config.resReduction = resReduction;
+    
+    // Set resistance type based on explicit base RES value
+    if (enemyBaseRES <= 0.0) {
+        config.resistanceType = EnemyResistanceType::Weak;
+    } else if (enemyBaseRES >= 0.40) {
+        config.resistanceType = EnemyResistanceType::Resistant;
+    } else {
+        config.resistanceType = EnemyResistanceType::Neutral;
+    }
+    
+    return calculateResistanceMultiplier(config);
+}
+
+double calculateResistanceMultiplier(
+    EnemyResistanceType resistanceType,
+    double resPenetration) {
+    
+    ResistanceMultiplierConfig config;
+    config.resistanceType = resistanceType;
+    config.resPenetration = resPenetration;
     
     return calculateResistanceMultiplier(config);
 }
@@ -164,15 +194,20 @@ double calculateResistanceMultiplier(
 // ============================================================================
 // SECTION 6: DMG TAKEN MULTIPLIER CALCULATION IMPLEMENTATION
 // ============================================================================
-// DMG Taken Mult = 1 + sum of all DMG Taken buffs on enemy
+// DMG Taken Mult = 100% + Elemental DMG Taken% + All-Type DMG Taken%
 
 double calculateDamageTakenMultiplier(const DamageTakenConfig& config) {
-    return 1.0 + config.dmgTakenBuff;
+    // DMG Taken Mult = 1 + Elemental DMG Taken% + All-Type DMG Taken%
+    return 1.0 + config.elementalDMGTaken + config.allTypeDMGTaken;
 }
 
-double calculateDamageTakenMultiplier(double dmgTakenBuff) {
+double calculateDamageTakenMultiplier(
+    double elementalDMGTaken,
+    double allTypeDMGTaken) {
+    
     DamageTakenConfig config;
-    config.dmgTakenBuff = dmgTakenBuff;
+    config.elementalDMGTaken = elementalDMGTaken;
+    config.allTypeDMGTaken = allTypeDMGTaken;
     
     return calculateDamageTakenMultiplier(config);
 }
