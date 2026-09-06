@@ -191,6 +191,22 @@ Texture2D* AssetManager::lightCone(const std::string& id)
     return nullptr;
 }
 
+Texture2D* AssetManager::relicSet(const std::string& id)
+{
+    // Relic-set and planar-set rules IDs already match the manifest's
+    // normalized_id directly for every known set, but we keep the same
+    // "new"-suffix fallback the light cones use in case a future scrape
+    // bakes a badge into one of these filenames too.
+    if (has(id))
+        return texture(id);
+
+    std::string withNew = id + "new";
+    if (has(withNew))
+        return texture(withNew);
+
+    return nullptr;
+}
+
 bool AssetManager::loadTextureFor(const std::string& id)
 {
     const AssetEntry* asset = entry(id);

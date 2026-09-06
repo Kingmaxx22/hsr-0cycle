@@ -13,19 +13,27 @@
 
 struct DropdownItem
 {
-    std::string key;      // Value/stat key or set name/id
-    std::string label;    // Display text
-    std::string assetId;  // Asset normalized ID for thumbnail texture (empty if none)
+    std::string key;
+    std::string label;
+    std::string assetId;
 };
 
 struct ActiveDropdown
 {
-    enum class Mode { None, MainStat, Substat, RelicSetA, RelicSetB, PlanarSet };
+    enum class Mode
+    {
+        None,
+        MainStat,
+        Substat,
+         RelicSetA,
+        RelicSetB,
+        PlanarSet
+    };
 
     bool open = false;
     Mode mode = Mode::None;
     GearSlot slot = GearSlot::Head;
-    int substatRow = -1; // -1 for main stat, 0..3 for substats
+    int substatRow = -1;
     Rectangle anchorRect{};
     std::vector<DropdownItem> items;
     std::string currentKey;
@@ -33,10 +41,6 @@ struct ActiveDropdown
     float scrollOffset = 0.0f;
 };
 
-// Per-character gear editor: 6 slots (Head/Hands/Body/Feet/Planar
-// Sphere/Link Rope), each with a main stat dropdown and up to 4 substat dropdowns
-// (type dropdown from available permutations + typed-in numeric value), plus relic-set
-// (4pc, or 2pc+2pc) and planar-set dropdown pickers with asset artwork icons.
 class RelicEditorScreen : public Screen
 {
 public:
@@ -68,6 +72,14 @@ private:
     void drawGearCard(GearSlot slot);
     void drawDropdown();
 
+    void openSetDropdown(ActiveDropdown::Mode mode, const std::string& category,
+                         const std::string& currentValue, Rectangle anchor);
+    void openMainStatDropdown(GearSlot slot, Rectangle anchor);
+    void openSubstatDropdown(GearSlot slot, int row, Rectangle anchor);
+     bool handleDropdownInput(Vector2 mouse, bool pressed);
+
+    std::vector<DropdownItem> buildSubstatItems(const GearPiece& piece, int row) const;
+ 
     std::string nextSetName(const std::string& category, const std::string& current) const;
 
     AssetManager& assets;
@@ -79,7 +91,7 @@ private:
     std::string characterId;
     bool backRequested = false;
 
-    int focusedField = -1; // slotIndex * 4 + substatIndex; -1 = no field focused
+    int focusedField = -1; // slotIndex * 4 + substatRow; -1 = no value field focused
     ActiveDropdown activeDropdown;
 
     static constexpr float kCardW = 350.0f;
