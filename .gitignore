@@ -1,38 +1,23 @@
 ```
-# Build artifacts
-*.o
-*.obj
-*.a
-*.so
-*.dll
-*.exe
-*.out
-
-# CMake build directory (common pattern)
+# Build system
 build/
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
 
-# Dependencies
-venv/
-.venv/
+# Compiled Python files
+*.pyc
 __pycache__/
-*.egg-info/
 
-# Logs and temporary files
-*.log
-*.tmp
-*.swp
+# Executables
+hsr_ui
 
-# Editors
-.vscode/
-.idea/
+# Assets (since they're in build/ they're likely generated)
+build/ui/assets/
 
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Environment files
-.env
-.env.local
-*.env.*
+# Logs
+CMakeOutput.log
 ```
