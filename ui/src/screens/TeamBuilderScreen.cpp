@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <unordered_set>
 
 static std::string toLowerCopy(const std::string& s)
 {
@@ -12,6 +13,55 @@ static std::string toLowerCopy(const std::string& s)
     return out;
 }
 
+// Preferred display order for known values; anything present in the data but
+// not listed here is appended alphabetically so nothing is ever silently hidden.
+static const std::vector<std::string> kCanonicalElementOrder = {
+    "physical", "fire", "ice", "lightning", "wind", "quantum", "imaginary"
+};
+
+static const std::vector<std::string> kCanonicalPathOrder = {
+    "Destruction", "Hunt", "Erudition", "Harmony", "Nihility",
+    "Preservation", "Abundance", "Remembrance", "Elation"
+};
+
+static std::vector<std::string> orderedUnique(const std::unordered_set<std::string>& present,
+                                               const std::vector<std::string>& canonical)
+{
+    std::vector<std::string> result;
+    for (const auto& v : canonical)
+        if (present.count(v))
+            result.push_back(v);
+
+    std::vector<std::string> extras;
+    for (const auto& v : present)
+        if (std::find(canonical.begin(), canonical.end(), v) == canonical.end())
+            extras.push_back(v);
+    std::sort(extras.begin(), extras.end());
+    result.insert(result.end(), extras.begin(), extras.end());
+    return result;
+}
+
+std::string TeamBuilderScreen::capitalize(const std::string& s)
+{
+    if (s.empty())
+        return s;
+    std::string out = s;
+    out[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(out[0])));
+    return out;
+}
+
+Color TeamBuilderScreen::elementColor(const std::string& element)
+{
+    if (element == "physical")  return Color{200, 200, 200, 255};
+    if (element == "fire")      return Color{230, 110, 70, 255};
+    if (element == "ice")       return Color{110, 190, 230, 255};
+    if (element == "lightning") return Color{175, 120, 230, 255};
+    if (element == "wind")      return Color{95, 200, 150, 255};
+    if (element == "quantum")   return Color{95, 100, 210, 255};
+    if (element == "imaginary") return Color{230, 205, 90, 255};
+    return Color{160, 165, 178, 255};
+}
+
 TeamBuilderScreen::TeamBuilderScreen(AssetManager& assets_, CharacterDatabase& characters_)
     : assets(assets_), characters(characters_)
 {
@@ -19,6 +69,27 @@ TeamBuilderScreen::TeamBuilderScreen(AssetManager& assets_, CharacterDatabase& c
 
 void TeamBuilderScreen::initialize()
 {
+    std::unordered_set<std::string> elementsPresent;
+    std::unordered_set<std::string> pathsPresent;
+    for (const auto& c : characters.all())
+    {
+        if (!c.element.empty())
+            elementsPresent.insert(c.element);
+        if (!c.path.empty())
+            pathsPresent.insert(c.path);
+    }
+
+    elementOrder = orderedUnique(elementsPresent, kCanonicalElementOrder);
+    pathOrder = orderedUnique(pathsPresent, kCanonicalPathOrder);
+
+    elementEnabled.clear();
+    for (const auto& e : elementOrder)
+        elementEnabled[e] = true;
+
+    pathEnabled.clear();
+    for (const auto& p : pathOrder)
+        pathEnabled[p] = true;
+
     updateFilteredRoster();
 }
 
@@ -43,6 +114,34 @@ Rectangle TeamBuilderScreen::fiveStarButtonBounds() const
     return Rectangle{647.0f, 438.0f, 55.0f, 34.0f};
 }
 
+void TeamBuilderScreen::updateFilterChipBounds()
+{
+    auto layoutRow = [](const std::vector<std::string>& order, float y,
+                         float leftPad, const auto& labelFn) {
+        std::vector<Rectangle> bounds;
+        constexpr float startX = 320.0f;
+        constexpr float padX = 14.0f;
+        constexpr float gap = 8.0f;
+
+        float x = startX;
+        for (const auto& key : order)
+        {
+            std::string label = labelFn(key);
+            int textW = MeasureText(label.c_str(), 14);
+            float w = static_cast<float>(textW) + padX + leftPad;
+            bounds.push_back(Rectangle{x, y, w, kFilterChipH});
+            x += w + gap;
+        }
+        return bounds;
+    };
+
+    // Element chips reserve extra left padding for their color dot.
+    elementChipBounds = layoutRow(elementOrder, kElementRowY, 26.0f,
+        [](const std::string& e) { return capitalize(e); });
+    pathChipBounds = layoutRow(pathOrder, kPathRowY, 14.0f,
+        [](const std::string& p) { return p; });
+}
+
 void TeamBuilderScreen::updateFilteredRoster()
 {
     filteredRoster.clear();
@@ -54,6 +153,14 @@ void TeamBuilderScreen::updateFilteredRoster()
         if (c.rarity == 4 && !showFourStar)
             continue;
         if (c.rarity == 5 && !showFiveStar)
+            continue;
+
+        auto elemIt = elementEnabled.find(c.element);
+        if (elemIt != elementEnabled.end() && !elemIt->second)
+            continue;
+
+        auto pathIt = pathEnabled.find(c.path);
+        if (pathIt != pathEnabled.end() && !pathIt->second)
             continue;
 
         if (!lowerQuery.empty())
@@ -71,6 +178,7 @@ void TeamBuilderScreen::update(float dt)
 {
     time += dt;
 
+    updateFilterChipBounds();
     updateFilteredRoster();
 
     int rows = static_cast<int>((filteredRoster.size() + kLibraryCols - 1) / kLibraryCols);
@@ -107,7 +215,11 @@ void TeamBuilderScreen::update(float dt)
         {
             Rectangle r{360.0f + i * 250.0f, 150.0f, 220.0f, 250.0f};
             if (CheckCollisionPointRec(mouse, r))
+            {
                 selectedSlot = i;
+                if (!team[i].empty())
+                    pendingEditorRequest = team[i];
+            }
         }
 
         if (!searchQuery.empty() && CheckCollisionPointRec(mouse, searchClearButtonBounds()))
@@ -118,6 +230,24 @@ void TeamBuilderScreen::update(float dt)
 
         if (CheckCollisionPointRec(mouse, fiveStarButtonBounds()))
             showFiveStar = !showFiveStar;
+
+        for (size_t i = 0; i < elementChipBounds.size(); ++i)
+        {
+            if (CheckCollisionPointRec(mouse, elementChipBounds[i]))
+            {
+                bool& enabled = elementEnabled[elementOrder[i]];
+                enabled = !enabled;
+            }
+        }
+
+        for (size_t i = 0; i < pathChipBounds.size(); ++i)
+        {
+            if (CheckCollisionPointRec(mouse, pathChipBounds[i]))
+            {
+                bool& enabled = pathEnabled[pathOrder[i]];
+                enabled = !enabled;
+            }
+        }
 
         if (CheckCollisionPointRec(mouse, libraryViewport))
         {
@@ -145,48 +275,19 @@ void TeamBuilderScreen::update(float dt)
 
 void TeamBuilderScreen::draw()
 {
-    ClearBackground(Color{18, 20, 27, 255});
-
-    drawSidebar();
     drawHeader();
     drawTeamSlots();
     drawSearchAndFilters();
     drawCharacterLibrary();
 }
 
-void TeamBuilderScreen::drawSidebar()
+bool TeamBuilderScreen::consumeEditorRequest(std::string& outCharacterId)
 {
-    DrawRectangle(0, 0, 270, GetScreenHeight(), Color{12, 14, 19, 255});
-    DrawRectangle(0, 0, 270, 72, Color{25, 28, 38, 255});
-
-    DrawText("HSR", 28, 17, 34, RAYWHITE);
-    DrawText("0-CYCLE", 87, 23, 20, GRAY);
-
-    const char* nav[] = {
-        "TEAM BUILDER",
-        "CHARACTERS",
-        "LIGHT CONES",
-        "RELICS",
-        "ENEMIES",
-        "ROTATION",
-        "SIMULATE",
-        "RULES"
-    };
-
-    for (int i = 0; i < 8; ++i)
-    {
-        Rectangle r{18.0f, 100.0f + i * 58.0f, 234.0f, 46.0f};
-
-        if (i == activeNav)
-            DrawRectangleRounded(r, 0.25f, 8, Color{55, 62, 82, 255});
-
-        DrawText(nav[i], 34, static_cast<int>(r.y + 13), 17,
-                 i == activeNav ? RAYWHITE : Color{155, 160, 174, 255});
-    }
-
-    DrawText("ENGINE", 28, GetScreenHeight() - 82, 13, GRAY);
-    DrawText("Rule engine: connected later", 28, GetScreenHeight() - 58, 13,
-             Color{115, 120, 132, 255});
+    if (pendingEditorRequest.empty())
+        return false;
+    outCharacterId = pendingEditorRequest;
+    pendingEditorRequest.clear();
+    return true;
 }
 
 void TeamBuilderScreen::drawHeader()
@@ -298,6 +399,49 @@ void TeamBuilderScreen::drawSearchAndFilters()
               static_cast<int>(filteredRoster.size()),
               static_cast<int>(characters.all().size())),
               712, 447, 15, Color{140, 145, 158, 255});
+
+    // Element filter chips — each gets a small color dot for its element.
+    for (size_t i = 0; i < elementOrder.size() && i < elementChipBounds.size(); ++i)
+    {
+        const std::string& key = elementOrder[i];
+        const Rectangle& r = elementChipBounds[i];
+        bool active = elementEnabled.count(key) ? elementEnabled.at(key) : true;
+
+        DrawRectangleRounded(r, 0.35f, 8,
+            active ? Color{44, 48, 62, 255} : Color{24, 26, 34, 255});
+        DrawRectangleRoundedLines(r, 0.35f, 8,
+            active ? Color{95, 100, 118, 255} : Color{45, 48, 58, 255});
+
+        Color dot = elementColor(key);
+        if (!active)
+            dot = Color{static_cast<unsigned char>(dot.r * 0.4f),
+                        static_cast<unsigned char>(dot.g * 0.4f),
+                        static_cast<unsigned char>(dot.b * 0.4f), 255};
+        DrawCircle(static_cast<int>(r.x + 15.0f), static_cast<int>(r.y + r.height / 2.0f),
+                   5.0f, dot);
+
+        std::string label = capitalize(key);
+        DrawText(label.c_str(), static_cast<int>(r.x + 26.0f),
+                 static_cast<int>(r.y + 8.0f), 14,
+                 active ? RAYWHITE : Color{130, 135, 148, 255});
+    }
+
+    // Path filter chips.
+    for (size_t i = 0; i < pathOrder.size() && i < pathChipBounds.size(); ++i)
+    {
+        const std::string& key = pathOrder[i];
+        const Rectangle& r = pathChipBounds[i];
+        bool active = pathEnabled.count(key) ? pathEnabled.at(key) : true;
+
+        DrawRectangleRounded(r, 0.35f, 8,
+            active ? Color{55, 62, 82, 255} : Color{24, 26, 34, 255});
+        DrawRectangleRoundedLines(r, 0.35f, 8,
+            active ? Color{115, 140, 190, 255} : Color{45, 48, 58, 255});
+
+        DrawText(key.c_str(), static_cast<int>(r.x + 14.0f),
+                 static_cast<int>(r.y + 8.0f), 14,
+                 active ? RAYWHITE : Color{130, 135, 148, 255});
+    }
 }
 
 void TeamBuilderScreen::drawCharacterLibrary()

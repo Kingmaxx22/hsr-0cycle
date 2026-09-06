@@ -3,10 +3,14 @@ add_executable(hsr_ui
     src/App.cpp
     src/assets/AssetManager.cpp
     src/data/CharacterDatabase.cpp
+    src/data/RelicSetDatabase.cpp
     src/screens/TeamBuilderScreen.cpp
+    src/screens/RelicRosterScreen.cpp
+    src/screens/RelicEditorScreen.cpp
     src/widgets/Button.cpp
     src/widgets/Panel.cpp
     src/widgets/CharacterCard.cpp
+    src/widgets/Sidebar.cpp
 )
 
 target_include_directories(hsr_ui PRIVATE
