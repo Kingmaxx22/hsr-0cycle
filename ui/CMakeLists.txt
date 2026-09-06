@@ -5,10 +5,12 @@ add_executable(hsr_ui
     src/data/CharacterDatabase.cpp
     src/data/RelicSetDatabase.cpp
     src/data/LightConeDatabase.cpp
+    src/data/EnemyDatabase.cpp
     src/screens/TeamBuilderScreen.cpp
     src/screens/RelicRosterScreen.cpp
     src/screens/RelicEditorScreen.cpp
     src/screens/LightConeScreen.cpp
+    src/screens/EnemiesScreen.cpp
     src/widgets/Button.cpp
     src/widgets/Panel.cpp
     src/widgets/CharacterCard.cpp

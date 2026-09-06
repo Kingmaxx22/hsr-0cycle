@@ -14,19 +14,23 @@ bool App::initialize()
 
     if (!characters.load(HSR_ENGINE_DATA_DIR))
     {
-        TraceLog(LOG_ERROR, "Failed to load character rules from: %s", HSR_ENGINE_DATA_DIR);
+        TraceLog(LOG_ERROR,
+                 "Failed to load character rules from: %s",
+                 HSR_ENGINE_DATA_DIR);
         return false;
     }
 
     if (!relicSets.load(HSR_ENGINE_DATA_DIR))
-    {
-        TraceLog(LOG_WARNING, "Failed to load relic set rules from: %s", HSR_ENGINE_DATA_DIR);
-    }
+        TraceLog(LOG_WARNING, "Failed to load relic set rules from: %s",
+                 HSR_ENGINE_DATA_DIR);
 
     if (!lightCones.load(HSR_ENGINE_DATA_DIR))
-    {
-        TraceLog(LOG_WARNING, "Failed to load light cones from: %s", HSR_ENGINE_DATA_DIR);
-    }
+        TraceLog(LOG_WARNING, "Failed to load light cones from: %s",
+                 HSR_ENGINE_DATA_DIR);
+
+    if (!enemies.load(HSR_ENGINE_DATA_DIR))
+        TraceLog(LOG_WARNING, "Failed to load monster rules from: %s",
+                 HSR_ENGINE_DATA_DIR);
 
     teamBuilder = std::make_unique<TeamBuilderScreen>(assets, characters);
     teamBuilder->initialize();
@@ -34,11 +38,19 @@ bool App::initialize()
     relicRoster = std::make_unique<RelicRosterScreen>(assets, characters);
     relicRoster->initialize();
 
-    relicEditor = std::make_unique<RelicEditorScreen>(assets, characters, relicSets, loadouts);
+    relicEditor =
+        std::make_unique<RelicEditorScreen>(
+            assets, characters, relicSets, loadouts);
     relicEditor->initialize();
 
-    lightConeScreen = std::make_unique<LightConeScreen>(assets, characters, lightCones, loadouts);
+    lightConeScreen =
+        std::make_unique<LightConeScreen>(
+            assets, characters, lightCones, loadouts);
     lightConeScreen->initialize();
+
+    enemiesScreen =
+        std::make_unique<EnemiesScreen>(assets, enemies);
+    enemiesScreen->initialize();
 
     return true;
 }
@@ -47,21 +59,29 @@ void App::goToRelicEditor(const std::string& characterId)
 {
     relicEditor->setTeamContext(teamBuilder->getTeam(), characterId);
     activeView = ActiveView::RelicEditor;
-    activeNav = 3; // RELICS
+    activeNav = 3;
 }
 
 void App::goToLightConeScreen(const std::string& characterId)
 {
-    lightConeScreen->setTeamContext(teamBuilder->getTeam(), characterId);
+    lightConeScreen->setTeamContext(
+        teamBuilder->getTeam(), characterId);
+
     activeView = ActiveView::LightCone;
-    activeNav = 2; // LIGHT CONES
+    activeNav = 2;
+}
+
+void App::goToEnemiesScreen()
+{
+    activeView = ActiveView::Enemies;
+    activeNav = 4;
 }
 
 void App::run()
 {
     while (!WindowShouldClose())
     {
-        float dt = GetFrameTime();
+        const float dt = GetFrameTime();
 
         switch (activeView)
         {
@@ -69,12 +89,14 @@ void App::run()
             case ActiveView::RelicRoster: relicRoster->update(dt); break;
             case ActiveView::RelicEditor: relicEditor->update(dt); break;
             case ActiveView::LightCone:   lightConeScreen->update(dt); break;
+            case ActiveView::Enemies:     enemiesScreen->update(dt); break;
         }
 
         BeginDrawing();
         ClearBackground(Color{18, 20, 27, 255});
 
-        int navClick = sidebar.updateAndDraw(activeNav);
+        const int navClick = sidebar.updateAndDraw(activeNav);
+
         if (navClick == 0)
         {
             activeView = ActiveView::TeamBuilder;
@@ -88,9 +110,12 @@ void App::run()
         {
             goToRelicEditor(teamBuilder->getSelectedCharacter());
         }
+        else if (navClick == 4)
+        {
+            goToEnemiesScreen();
+        }
         else if (navClick >= 0)
         {
-            // Other nav entries aren't wired to a screen yet -- just highlight.
             activeNav = navClick;
         }
 
@@ -100,38 +125,53 @@ void App::run()
             {
                 teamBuilder->draw();
                 std::string requested;
+
                 if (teamBuilder->consumeEditorRequest(requested))
                     goToRelicEditor(requested);
+
                 break;
             }
+
             case ActiveView::RelicRoster:
             {
                 relicRoster->draw();
                 std::string selected;
+
                 if (relicRoster->consumeSelection(selected))
                     goToRelicEditor(selected);
+
                 break;
             }
+
             case ActiveView::RelicEditor:
-            {
                 relicEditor->draw();
+
                 if (relicEditor->consumeBackRequest())
                 {
                     activeView = ActiveView::TeamBuilder;
                     activeNav = 0;
                 }
                 break;
-            }
+
             case ActiveView::LightCone:
-            {
                 lightConeScreen->draw();
+
                 if (lightConeScreen->consumeBackRequest())
                 {
                     activeView = ActiveView::TeamBuilder;
                     activeNav = 0;
                 }
                 break;
-            }
+
+            case ActiveView::Enemies:
+                enemiesScreen->draw();
+
+                if (enemiesScreen->consumeBackRequest())
+                {
+                    activeView = ActiveView::TeamBuilder;
+                    activeNav = 0;
+                }
+                break;
         }
 
         EndDrawing();
@@ -140,10 +180,12 @@ void App::run()
 
 void App::shutdown()
 {
+    enemiesScreen.reset();
     lightConeScreen.reset();
     relicEditor.reset();
     relicRoster.reset();
     teamBuilder.reset();
+
     assets.unloadAll();
     CloseWindow();
 }

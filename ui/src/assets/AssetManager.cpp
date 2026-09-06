@@ -1,8 +1,10 @@
 #include "AssetManager.h"
 #include "raylib.h"
 
+#include <algorithm>
+#include <cctype>
 #include <fstream>
-#include <sstream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -15,18 +17,14 @@ static std::vector<std::string> splitCsv(const std::string& line)
     for (char c : line)
     {
         if (c == '"')
-        {
             quoted = !quoted;
-        }
         else if (c == ',' && !quoted)
         {
             result.push_back(field);
             field.clear();
         }
         else
-        {
             field += c;
-        }
     }
 
     result.push_back(field);
@@ -35,28 +33,24 @@ static std::vector<std::string> splitCsv(const std::string& line)
 
 bool AssetManager::loadManifest(const std::string& manifestPath)
 {
-    // Always resolve relative resource paths from the executable directory.
     std::string fullManifestPath = manifestPath;
 
     if (!IsPathAbsolute(manifestPath.c_str()))
-    {
         fullManifestPath =
             std::string(GetApplicationDirectory()) + "/" + manifestPath;
-    }
 
-    TraceLog(LOG_INFO, "Loading asset manifest: %s",
-             fullManifestPath.c_str());
+    manifestDirectory = directoryOf(fullManifestPath);
 
     std::ifstream file(fullManifestPath);
-
     if (!file)
     {
-        TraceLog(LOG_ERROR, "Could not open asset manifest: %s",
+        TraceLog(LOG_ERROR,
+                 "Could not open asset manifest: %s",
                  fullManifestPath.c_str());
         return false;
     }
 
-    manifestDirectory = directoryOf(fullManifestPath);
+    entries.clear();
 
     std::string line;
     bool header = true;
@@ -72,22 +66,21 @@ bool AssetManager::loadManifest(const std::string& manifestPath)
             continue;
         }
 
-        auto fields = splitCsv(line);
-
+        const auto fields = splitCsv(line);
         if (fields.size() < 6)
             continue;
 
-        AssetEntry entryData;
+        AssetEntry asset;
+        asset.path = fields[0];
+        asset.filename = fields[1];
+        asset.normalizedId = fields[3];
+        asset.category = fields[5];
 
-        entryData.path = fields[0];
-        entryData.filename = fields[1];
-        entryData.normalizedId = fields[3];
-        entryData.category = fields[5];
-
-        entries[entryData.normalizedId] = entryData;
+        entries[asset.normalizedId] = asset;
     }
 
-    TraceLog(LOG_INFO, "Loaded %zu assets from manifest",
+    TraceLog(LOG_INFO,
+             "Loaded %zu assets from manifest",
              entries.size());
 
     return !entries.empty();
@@ -100,18 +93,13 @@ bool AssetManager::has(const std::string& id) const
 
 const AssetEntry* AssetManager::entry(const std::string& id) const
 {
-    auto it = entries.find(id);
-
-    if (it == entries.end())
-        return nullptr;
-
-    return &it->second;
+    const auto it = entries.find(id);
+    return it == entries.end() ? nullptr : &it->second;
 }
 
 Texture2D* AssetManager::texture(const std::string& id)
 {
-    auto loaded = textures.find(id);
-
+    const auto loaded = textures.find(id);
     if (loaded != textures.end())
         return &loaded->second;
 
@@ -121,8 +109,6 @@ Texture2D* AssetManager::texture(const std::string& id)
     return &textures[id];
 }
 
-// Ids that don't survive simple hyphen->underscore normalization because
-// the rules-engine scrape and the asset scrape genuinely disagree on naming.
 static const std::unordered_map<std::string, std::string>& characterAliases()
 {
     static const std::unordered_map<std::string, std::string> aliases = {
@@ -139,70 +125,178 @@ static const std::unordered_map<std::string, std::string>& characterAliases()
 
 Texture2D* AssetManager::character(const std::string& id)
 {
-    // Direct hit first.
     if (has(id))
         return texture(id);
 
-    // Known mismatches between the rules-engine slug and the asset filename.
-    auto& aliases = characterAliases();
-    auto aliasIt = aliases.find(id);
+    const auto& aliases = characterAliases();
+    const auto aliasIt = aliases.find(id);
+
     if (aliasIt != aliases.end() && has(aliasIt->second))
         return texture(aliasIt->second);
 
-    // Fall back to hyphen->underscore normalization (covers most cases).
     std::string normalized = id;
     for (char& c : normalized)
-        if (c == '-') c = '_';
+        if (c == '-')
+            c = '_';
 
-    if (has(normalized))
-        return texture(normalized);
-
-    return nullptr;
-}
-
-// Light cone slugs whose engine-side name disagrees with the asset-scrape
-// filename for a reason other than the generic "New" badge suffix below.
-static const std::unordered_map<std::string, std::string>& lightConeAliases()
-{
-    static const std::unordered_map<std::string, std::string> aliases = {};
-    return aliases;
+    return has(normalized) ? texture(normalized) : nullptr;
 }
 
 Texture2D* AssetManager::lightCone(const std::string& id)
 {
-    // Direct hit first.
     if (has(id))
         return texture(id);
 
-    // Known one-off mismatches.
-    auto& aliases = lightConeAliases();
-    auto aliasIt = aliases.find(id);
-    if (aliasIt != aliases.end() && has(aliasIt->second))
-        return texture(aliasIt->second);
-
-    // The Prydwen scraper occasionally bakes a "NEW" badge onto a recently
-    // added light cone's filename (e.g. reforged_in_hellfire ->
-    // reforged_in_hellfirenew), while the engine-side slug never picks up
-    // that suffix. Try the "new"-suffixed id as a fallback before giving up.
-    std::string withNew = id + "new";
-    if (has(withNew))
-        return texture(withNew);
-
-    return nullptr;
+    const std::string withNew = id + "new";
+    return has(withNew) ? texture(withNew) : nullptr;
 }
 
 Texture2D* AssetManager::relicSet(const std::string& id)
 {
-    // Relic-set and planar-set rules IDs already match the manifest's
-    // normalized_id directly for every known set, but we keep the same
-    // "new"-suffix fallback the light cones use in case a future scrape
-    // bakes a badge into one of these filenames too.
     if (has(id))
         return texture(id);
 
-    std::string withNew = id + "new";
-    if (has(withNew))
-        return texture(withNew);
+    const std::string withNew = id + "new";
+    return has(withNew) ? texture(withNew) : nullptr;
+}
+
+std::vector<std::string> AssetManager::enemyNameCandidates(
+    const std::string& displayName) const
+{
+    std::vector<std::string> candidates;
+
+    if (displayName.empty())
+        return candidates;
+
+    auto add = [&](const std::string& value)
+    {
+        if (value.empty())
+            return;
+
+        if (std::find(candidates.begin(), candidates.end(), value) ==
+            candidates.end())
+        {
+            candidates.push_back(value);
+        }
+    };
+
+    // First try the filename exactly as supplied.
+    add(displayName + ".png");
+
+    // Lowercase version.
+    std::string lower = displayName;
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c)
+                   {
+                       return static_cast<char>(std::tolower(c));
+                   });
+    add(lower + ".png");
+
+    // Replace filesystem-unfriendly punctuation/spaces with underscores.
+    std::string slug = lower;
+
+    for (char& c : slug)
+    {
+        const bool keep =
+            std::isalnum(static_cast<unsigned char>(c)) ||
+            c == '_' || c == '-';
+
+        if (!keep)
+            c = '_';
+    }
+
+    // Collapse repeated underscores and trim them.
+    std::string compact;
+    bool previousUnderscore = false;
+
+    for (char c : slug)
+    {
+        if (c == '_')
+        {
+            if (previousUnderscore)
+                continue;
+
+            previousUnderscore = true;
+            compact.push_back(c);
+        }
+        else
+        {
+            previousUnderscore = false;
+            compact.push_back(c);
+        }
+    }
+
+    while (!compact.empty() && compact.front() == '_')
+        compact.erase(compact.begin());
+
+    while (!compact.empty() && compact.back() == '_')
+        compact.pop_back();
+
+    add(compact + ".png");
+
+    // Common variant: spaces -> hyphens.
+    std::string hyphen = lower;
+    for (char& c : hyphen)
+        if (c == ' ')
+            c = '-';
+
+    add(hyphen + ".png");
+
+    return candidates;
+}
+
+Texture2D* AssetManager::enemy(
+    const std::string& id,
+    const std::string& displayName)
+{
+    // Enemy artwork is deliberately name-first. The asset manifest can contain
+    // unrelated entries keyed by the same numeric ID, while the current enemy
+    // pack is explicitly stored as <enemy name>.png.
+    const std::string cacheKey =
+        "__enemy__" + id;
+
+    const auto loaded = textures.find(cacheKey);
+    if (loaded != textures.end())
+        return &loaded->second;
+
+    const std::string enemyDirectory =
+        joinPath(manifestDirectory, "prydwen_assets/enemies");
+
+    // The user stated the images are PNG files named after their enemies.
+    for (const std::string& filename : enemyNameCandidates(displayName))
+    {
+        const std::string path = joinPath(enemyDirectory, filename);
+
+        if (FileExists(path.c_str()))
+        {
+            if (loadTextureAt(cacheKey, path))
+                return &textures[cacheKey];
+        }
+    }
+
+    // Backward-compatible fallbacks for older packs.
+    const std::vector<std::string> legacy = {
+        "Monster_" + id + ".png",
+        "Monster_" + id + ".webp",
+        id + ".png",
+        id + ".webp"
+    };
+
+    for (const std::string& filename : legacy)
+    {
+        const std::string path = joinPath(enemyDirectory, filename);
+
+        if (FileExists(path.c_str()) &&
+            loadTextureAt(cacheKey, path))
+        {
+            return &textures[cacheKey];
+        }
+    }
+
+    TraceLog(LOG_WARNING,
+             "Enemy artwork not found for '%s' (id=%s)",
+             displayName.c_str(),
+             id.c_str());
 
     return nullptr;
 }
@@ -219,44 +313,33 @@ bool AssetManager::loadTextureFor(const std::string& id)
         return false;
     }
 
-    std::string fullPath = joinPath(manifestDirectory, asset->path);
+    return loadTextureAt(
+        id,
+        joinPath(manifestDirectory, asset->path));
+}
 
-    TraceLog(LOG_INFO,
-             "Loading texture [%s]: %s",
-             id.c_str(),
-             fullPath.c_str());
-
-    if (!FileExists(fullPath.c_str()))
-    {
-        TraceLog(LOG_ERROR,
-                 "Texture file does not exist: %s",
-                 fullPath.c_str());
+bool AssetManager::loadTextureAt(
+    const std::string& key,
+    const std::string& path)
+{
+    if (!FileExists(path.c_str()))
         return false;
-    }
 
-    Texture2D texture = LoadTexture(fullPath.c_str());
+    const Texture2D loaded = LoadTexture(path.c_str());
 
-    if (texture.id == 0)
-    {
-        TraceLog(LOG_ERROR,
-                 "Raylib failed to load texture: %s",
-                 fullPath.c_str());
+    if (loaded.id == 0)
         return false;
-    }
 
-    textures[id] = texture;
-
+    textures[key] = loaded;
     return true;
 }
 
 std::string AssetManager::directoryOf(const std::string& path) const
 {
     const auto position = path.find_last_of("/\\");
-
-    if (position == std::string::npos)
-        return ".";
-
-    return path.substr(0, position);
+    return position == std::string::npos
+        ? "."
+        : path.substr(0, position);
 }
 
 std::string AssetManager::joinPath(
@@ -275,9 +358,7 @@ std::string AssetManager::joinPath(
 void AssetManager::unloadAll()
 {
     for (auto& [id, texture] : textures)
-    {
         UnloadTexture(texture);
-    }
 
     textures.clear();
 }
