@@ -14,6 +14,7 @@ add_executable(hsr_ui
     src/screens/SimulationScreen.cpp
     ../src/simulation/SimulationEngine.cpp
     ../src/simulation/EngineBridge.cpp
+    ../src/simulation/DamageCalculator.cpp
     src/widgets/Button.cpp
     src/widgets/Panel.cpp
     src/widgets/CharacterCard.cpp
