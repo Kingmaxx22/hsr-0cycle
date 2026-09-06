@@ -257,43 +257,76 @@ double calculateDamageTakenMultiplier(
 );
 
 // ============================================================================
-// SECTION 7: UNIVERSAL DMG REDUCTION CALCULATION
+// SECTION 7: UNIVERSAL DMG REDUCTION MULTIPLIER
 // ============================================================================
-// Universal DMG Reduction Mult = 1 - sum of all universal damage reductions
+// Universal DMG Reduction Mult = 100% x (1 - Reduction_1) x (1 - Reduction_2) x ...
 //
-// This includes effects that reduce outgoing damage universally.
+// Rules:
+// - Multiple reduction sources stack MULTIPLICATIVELY, not additively.
+// - Unbroken enemies with Toughness apply a built-in 10% reduction (0.90 multiplier).
+// - Once the enemy is Broken, this built-in reduction becomes 0% (1.00 multiplier).
 
 struct UniversalDamageReductionConfig {
-    double universalReduction;  // Total universal reduction as decimal (e.g., 0.10 for 10%)
+    std::vector<double> reductionSources;  // Array of reduction decimals (e.g., [0.10, 0.15])
+    bool isEnemyBroken;                    // If true, no built-in Toughness reduction
     
     UniversalDamageReductionConfig()
-        : universalReduction(0.0) {}
+        : isEnemyBroken(false) {}
 };
 
+/**
+ * Calculates the Universal DMG Reduction multiplier.
+ * 
+ * Universal DMG Reduction Mult = 100% x (1 - Reduction_1) x (1 - Reduction_2) x ...
+ * 
+ * Rules:
+ * - Multiple reduction sources stack MULTIPLICATIVELY
+ * - Unbroken enemies with Toughness apply a built-in 10% reduction (0.90 multiplier)
+ * - Broken enemies have no built-in Toughness reduction (1.00 multiplier)
+ * 
+ * @param config The universal damage reduction configuration
+ * @return The calculated universal reduction multiplier as a decimal
+ */
 double calculateUniversalDamageReductionMultiplier(const UniversalDamageReductionConfig& config);
 
-// Convenience overload
-double calculateUniversalDamageReductionMultiplier(double universalReduction = 0.0);
+// Convenience overload with single reduction value and broken state
+double calculateUniversalDamageReductionMultiplier(
+    double universalReduction,  // Single reduction source as decimal
+    bool isEnemyBroken
+);
 
 // ============================================================================
-// SECTION 8: WEAKEN MULTIPLIER CALCULATION
+// SECTION 8: WEAKENESS MULTIPLIER
 // ============================================================================
-// Weaken Mult = 1 - Weaken DMG Reduction
+// Weakeness Mult = 100% - Weakeness%
 //
-// Weaken is a specific debuff that reduces enemy's damage output,
-// but can also affect damage dealt to weakened enemies in some contexts.
+// Only relevant when calculating damage dealt BY enemies (e.g. Natasha's or
+// Sampo's passive Weaken effect reducing incoming enemy damage). Default 0%
+// (mult = 1.0) for player-character outgoing damage calculations.
 
-struct WeakenConfig {
-    double weakenReduction;  // Weaken DMG reduction as decimal (e.g., 0.15 for 15%)
+struct WeakenessConfig {
+    double weakenessPercent;  // Weakeness% as decimal (e.g., 0.20 for 20%), default 0.0
     
-    WeakenConfig()
-        : weakenReduction(0.0) {}
+    WeakenessConfig()
+        : weakenessPercent(0.0) {}
 };
 
-double calculateWeakenMultiplier(const WeakenConfig& config);
+/**
+ * Calculates the Weakeness multiplier.
+ * 
+ * Weakeness Mult = 100% - Weakeness%
+ * 
+ * Only relevant when calculating damage dealt BY enemies (e.g., Natasha's or
+ * Sampo's passive Weaken effect reducing incoming enemy damage). Default 0%
+ * (mult = 1.0) for player-character outgoing damage calculations.
+ * 
+ * @param config The weakeness configuration
+ * @return The calculated weakeness multiplier as a decimal
+ */
+double calculateWeakenessMultiplier(const WeakenessConfig& config);
 
 // Convenience overload
-double calculateWeakenMultiplier(double weakenReduction = 0.0);
+double calculateWeakenessMultiplier(double weakenessPercent = 0.0);
 
 // ============================================================================
 // SECTION 1: MASTER DAMAGE FORMULA
@@ -313,7 +346,7 @@ struct MasterDamageConfig {
     ResistanceMultiplierConfig resistanceConfig;
     DamageTakenConfig damageTakenConfig;
     UniversalDamageReductionConfig universalReductionConfig;
-    WeakenConfig weakenConfig;
+    WeakenessConfig weakenessConfig;
     
     MasterDamageConfig()
         : dmgPercentMultiplier(1.0) {}
@@ -326,7 +359,7 @@ struct DamageResult {
     double resistanceMultiplier;
     double damageTakenMultiplier;
     double universalReductionMultiplier;
-    double weakenMultiplier;
+    double weakenessMultiplier;
     double finalDamage;
     
     DamageResult()
@@ -336,7 +369,7 @@ struct DamageResult {
         , resistanceMultiplier(1.0)
         , damageTakenMultiplier(1.0)
         , universalReductionMultiplier(1.0)
-        , weakenMultiplier(1.0)
+        , weakenessMultiplier(1.0)
         , finalDamage(0.0) {}
 };
 
@@ -344,7 +377,7 @@ struct DamageResult {
  * Calculates the full outgoing damage using the master formula.
  * 
  * Outgoing DMG = Base DMG x DMG% Mult x DEF Mult x RES Mult x DMG Taken Mult 
- *                x Universal DMG Reduction Mult x Weaken Mult
+ *                x Universal DMG Reduction Mult x Weakeness Mult
  * 
  * @param config The complete damage configuration
  * @return DamageResult containing all intermediate values and final damage

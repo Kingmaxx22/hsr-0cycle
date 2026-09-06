@@ -213,37 +213,67 @@ double calculateDamageTakenMultiplier(
 }
 
 // ============================================================================
-// SECTION 7: UNIVERSAL DMG REDUCTION CALCULATION IMPLEMENTATION
+// SECTION 7: UNIVERSAL DMG REDUCTION MULTIPLIER IMPLEMENTATION
 // ============================================================================
-// Universal DMG Reduction Mult = 1 - sum of all universal damage reductions
+// Universal DMG Reduction Mult = 100% x (1 - Reduction_1) x (1 - Reduction_2) x ...
+//
+// Rules:
+// - Multiple reduction sources stack MULTIPLICATIVELY
+// - Unbroken enemies with Toughness apply a built-in 10% reduction (0.90 multiplier)
+// - Broken enemies have no built-in Toughness reduction (1.00 multiplier)
 
 double calculateUniversalDamageReductionMultiplier(const UniversalDamageReductionConfig& config) {
-    double reduction = std::clamp(config.universalReduction, 0.0, 1.0);
-    return 1.0 - reduction;
+    // Start with base 100% (1.0)
+    double universalReductionMult = 1.0;
+    
+    // If enemy is not broken, apply built-in Toughness reduction (10%)
+    if (!config.isEnemyBroken) {
+        universalReductionMult *= 0.90;  // 100% - 10% = 90% = 0.90
+    }
+    
+    // Apply each reduction source multiplicatively
+    for (double reduction : config.reductionSources) {
+        // Clamp individual reduction to valid range [0, 1]
+        double clampedReduction = std::clamp(reduction, 0.0, 1.0);
+        universalReductionMult *= (1.0 - clampedReduction);
+    }
+    
+    return universalReductionMult;
 }
 
-double calculateUniversalDamageReductionMultiplier(double universalReduction) {
+double calculateUniversalDamageReductionMultiplier(
+    double universalReduction,
+    bool isEnemyBroken) {
+    
     UniversalDamageReductionConfig config;
-    config.universalReduction = universalReduction;
+    config.isEnemyBroken = isEnemyBroken;
+    if (universalReduction > 0.0) {
+        config.reductionSources.push_back(universalReduction);
+    }
     
     return calculateUniversalDamageReductionMultiplier(config);
 }
 
 // ============================================================================
-// SECTION 8: WEAKEN MULTIPLIER CALCULATION IMPLEMENTATION
+// SECTION 8: WEAKENESS MULTIPLIER IMPLEMENTATION
 // ============================================================================
-// Weaken Mult = 1 - Weaken DMG Reduction
+// Weakeness Mult = 100% - Weakeness%
+//
+// Only relevant when calculating damage dealt BY enemies (e.g. Natasha's or
+// Sampo's passive Weaken effect reducing incoming enemy damage). Default 0%
+// (mult = 1.0) for player-character outgoing damage calculations.
 
-double calculateWeakenMultiplier(const WeakenConfig& config) {
-    double weaken = std::clamp(config.weakenReduction, 0.0, 1.0);
-    return 1.0 - weaken;
+double calculateWeakenessMultiplier(const WeakenessConfig& config) {
+    // Clamp weakeness to valid range [0, 1]
+    double weakeness = std::clamp(config.weakenessPercent, 0.0, 1.0);
+    return 1.0 - weakeness;
 }
 
-double calculateWeakenMultiplier(double weakenReduction) {
-    WeakenConfig config;
-    config.weakenReduction = weakenReduction;
+double calculateWeakenessMultiplier(double weakenessPercent) {
+    WeakenessConfig config;
+    config.weakenessPercent = weakenessPercent;
     
-    return calculateWeakenMultiplier(config);
+    return calculateWeakenessMultiplier(config);
 }
 
 // ============================================================================
@@ -274,19 +304,19 @@ DamageResult calculateOutgoingDamage(const MasterDamageConfig& config) {
     result.universalReductionMultiplier = calculateUniversalDamageReductionMultiplier(
         config.universalReductionConfig);
     
-    // Calculate Weaken Multiplier (Section 8)
-    result.weakenMultiplier = calculateWeakenMultiplier(config.weakenConfig);
+    // Calculate Weakeness Multiplier (Section 8)
+    result.weakenessMultiplier = calculateWeakenessMultiplier(config.weakenessConfig);
     
     // Apply master formula:
     // Outgoing DMG = Base DMG x DMG% Mult x DEF Mult x RES Mult x DMG Taken Mult
-    //                x Universal DMG Reduction Mult x Weaken Mult
+    //                x Universal DMG Reduction Mult x Weakeness Mult
     result.finalDamage = result.baseDamage
                        * result.dmgPercentMultiplier
                        * result.defenseMultiplier
                        * result.resistanceMultiplier
                        * result.damageTakenMultiplier
                        * result.universalReductionMultiplier
-                       * result.weakenMultiplier;
+                       * result.weakenessMultiplier;
     
     return result;
 }
