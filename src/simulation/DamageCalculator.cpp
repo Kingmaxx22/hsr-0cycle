@@ -277,6 +277,78 @@ double calculateWeakenessMultiplier(double weakenessPercent) {
 }
 
 // ============================================================================
+// SECTION 9: CORE STAT TOTALS IMPLEMENTATION
+// ============================================================================
+// HP Total    = (Character Base HP  + LC Base HP)  x (1 + HP%)  + Flat HP
+// ATK Total   = (Character Base ATK + LC Base ATK) x (1 + ATK%) + Flat ATK
+// DEF Total   = (Character Base DEF + LC Base DEF) x (1 + DEF%) + Flat DEF
+// Speed Total = Character Base Speed x (1 + Speed%) + Flat Speed
+//
+// Important rule: Light Cone BASE stats merge with character BASE stats FIRST,
+// before percentage bonuses are applied.
+
+double calculateTotalHP(const CoreStatConfig& config) {
+    // HP Total = (Character Base HP + LC Base HP) x (1 + HP%) + Flat HP
+    double combinedBase = config.characterBase + config.lightConeBase;
+    return combinedBase * (1.0 + config.percentBonus) + config.flatBonus;
+}
+
+double calculateTotalATK(const CoreStatConfig& config) {
+    // ATK Total = (Character Base ATK + LC Base ATK) x (1 + ATK%) + Flat ATK
+    double combinedBase = config.characterBase + config.lightConeBase;
+    return combinedBase * (1.0 + config.percentBonus) + config.flatBonus;
+}
+
+double calculateTotalDEF(const CoreStatConfig& config) {
+    // DEF Total = (Character Base DEF + LC Base DEF) x (1 + DEF%) + Flat DEF
+    double combinedBase = config.characterBase + config.lightConeBase;
+    return combinedBase * (1.0 + config.percentBonus) + config.flatBonus;
+}
+
+double calculateTotalSpeed(const CoreStatConfig& config) {
+    // Speed Total = Character Base Speed x (1 + Speed%) + Flat Speed
+    // Note: Light Cones do not provide base Speed, so lightConeBase should be 0
+    return config.characterBase * (1.0 + config.percentBonus) + config.flatBonus;
+}
+
+// Convenience overloads with individual parameters
+double calculateTotalHP(double characterBase, double lightConeBase, double percentBonus, double flatBonus) {
+    CoreStatConfig config;
+    config.characterBase = characterBase;
+    config.lightConeBase = lightConeBase;
+    config.percentBonus = percentBonus;
+    config.flatBonus = flatBonus;
+    return calculateTotalHP(config);
+}
+
+double calculateTotalATK(double characterBase, double lightConeBase, double percentBonus, double flatBonus) {
+    CoreStatConfig config;
+    config.characterBase = characterBase;
+    config.lightConeBase = lightConeBase;
+    config.percentBonus = percentBonus;
+    config.flatBonus = flatBonus;
+    return calculateTotalATK(config);
+}
+
+double calculateTotalDEF(double characterBase, double lightConeBase, double percentBonus, double flatBonus) {
+    CoreStatConfig config;
+    config.characterBase = characterBase;
+    config.lightConeBase = lightConeBase;
+    config.percentBonus = percentBonus;
+    config.flatBonus = flatBonus;
+    return calculateTotalDEF(config);
+}
+
+double calculateTotalSpeed(double characterBase, double percentBonus, double flatBonus) {
+    CoreStatConfig config;
+    config.characterBase = characterBase;
+    config.lightConeBase = 0.0;  // Light Cones don't provide base Speed
+    config.percentBonus = percentBonus;
+    config.flatBonus = flatBonus;
+    return calculateTotalSpeed(config);
+}
+
+// ============================================================================
 // SECTION 1: MASTER DAMAGE FORMULA IMPLEMENTATION
 // ============================================================================
 // Outgoing DMG = Base DMG x DMG% Mult x DEF Mult x RES Mult x DMG Taken Mult
