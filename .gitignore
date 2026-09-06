@@ -1,1 +1,12 @@
-(src/simulation/DamageCalculator.cpp, src/simulation/DamageCalculator.h)
+```
+# Build artifacts
+build/
+CMakeCache.txt
+CMakeFiles/
+
+# Compiled files
+*.o
+*.obj
+*.bin
+*.out
+```

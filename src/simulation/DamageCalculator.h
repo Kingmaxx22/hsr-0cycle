@@ -167,48 +167,94 @@ double calculateDefenseMultiplier(
 // ============================================================================
 // SECTION 5: RESISTANCE MULTIPLIER CALCULATION
 // ============================================================================
-// RES Mult calculation based on enemy resistance and RES Penetration
+// RES Mult = 100% - (RES% - RES PEN%)
 //
-// This will be implemented in the next section.
+// Rules:
+// - Base enemy RES to all elements = 20%, UNLESS the enemy has an innate weakness or resistance.
+// - Enemy weak to the element -> RES = 0%.
+// - Enemy resistant to the element -> RES = 40%.
+// - RES is clamped between -100% (min) and 90% (max) before applying PEN.
+//
+// Effective RES = clamp(enemyBaseRES, -1.0, 0.9) - resPenetration
+// RES Mult = 1 - Effective RES, clamped to range [0.1, 2.0]
 
-struct ResistanceMultiplierConfig {
-    double enemyResistance;  // Enemy's base RES (e.g., 0.10 for 10%)
-    double resPenetration;   // Character's RES Penetration (e.g., 0.20 for 20%)
-    double resReduction;     // RES Reduction debuffs on enemy (e.g., 0.10 for 10%)
-    
-    ResistanceMultiplierConfig()
-        : enemyResistance(0.10)  // Default 10% resistance
-        , resPenetration(0.0)
-        , resReduction(0.0) {}
+enum class EnemyResistanceType {
+    Neutral,    // Base RES = 20%
+    Weak,       // Base RES = 0% (enemy weak to this element)
+    Resistant   // Base RES = 40% (enemy resistant to this element)
 };
 
+struct ResistanceMultiplierConfig {
+    EnemyResistanceType resistanceType;  // Determines base RES value
+    double resPenetration;               // Character's RES Penetration (e.g., 0.20 for 20%)
+    
+    ResistanceMultiplierConfig()
+        : resistanceType(EnemyResistanceType::Neutral)  // Default 20% base RES
+        , resPenetration(0.0) {}
+};
+
+/**
+ * Calculates the Resistance multiplier.
+ * 
+ * RES Mult = 100% - (RES% - RES PEN%)
+ * 
+ * Rules:
+ * - Base enemy RES = 20% (Neutral), 0% (Weak), or 40% (Resistant)
+ * - RES is clamped between -100% and 90% before applying PEN
+ * - Final multiplier is clamped to range [0.1, 2.0]
+ * 
+ * @param config The resistance multiplier configuration
+ * @return The calculated RES multiplier as a decimal (range 0.1 to 2.0)
+ */
 double calculateResistanceMultiplier(const ResistanceMultiplierConfig& config);
 
-// Convenience overload
+// Convenience overload with explicit base RES value
 double calculateResistanceMultiplier(
-    double enemyResistance,
-    double resPenetration = 0.0,
-    double resReduction = 0.0
+    double enemyBaseRES,  // Explicit base RES (e.g., 0.20 for 20%)
+    double resPenetration = 0.0
+);
+
+// Convenience overload using resistance type
+double calculateResistanceMultiplier(
+    EnemyResistanceType resistanceType,
+    double resPenetration = 0.0
 );
 
 // ============================================================================
 // SECTION 6: DMG TAKEN MULTIPLIER CALCULATION
 // ============================================================================
-// DMG Taken Mult = 1 + sum of all DMG Taken buffs on enemy
+// DMG Taken Mult = 100% + Elemental DMG Taken% + All-Type DMG Taken%
 //
-// This includes effects like "Target takes X% more DMG" debuffs.
+// This comes from debuffs applied TO the enemy that increase damage they take
+// (e.g. Welt's Ultimate, Sampo's Ultimate). Default to 0% if none active.
 
 struct DamageTakenConfig {
-    double dmgTakenBuff;  // Total DMG Taken buff as decimal (e.g., 0.20 for 20%)
+    double elementalDMGTaken;   // Elemental DMG Taken% (only for matching element)
+    double allTypeDMGTaken;     // All-Type DMG Taken%
     
     DamageTakenConfig()
-        : dmgTakenBuff(0.0) {}
+        : elementalDMGTaken(0.0)
+        , allTypeDMGTaken(0.0) {}
 };
 
+/**
+ * Calculates the DMG Taken multiplier.
+ * 
+ * DMG Taken Mult = 100% + Elemental DMG Taken% + All-Type DMG Taken%
+ * 
+ * This includes debuffs applied to the enemy that increase damage they take
+ * (e.g., Welt's Ultimate, Sampo's Ultimate).
+ * 
+ * @param config The DMG taken configuration
+ * @return The calculated DMG Taken multiplier as a decimal
+ */
 double calculateDamageTakenMultiplier(const DamageTakenConfig& config);
 
 // Convenience overload
-double calculateDamageTakenMultiplier(double dmgTakenBuff = 0.0);
+double calculateDamageTakenMultiplier(
+    double elementalDMGTaken = 0.0,
+    double allTypeDMGTaken = 0.0
+);
 
 // ============================================================================
 // SECTION 7: UNIVERSAL DMG REDUCTION CALCULATION
