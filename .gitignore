@@ -1,28 +1,44 @@
-# CMake build output
-build/
-raylib/build/
-
-# Visual Studio
-.vs/
-*.suo
-*.user
-*.userosscache
-*.sln
-*.vcxproj.user
-
-# Compiled binaries
-*.exe
-*.dll
-*.lib
-*.obj
-*.pdb
-
-# Python
-__pycache__/
+```
+# Compiled Python files
 *.pyc
+__pycache__/
+
+# Dependencies
 .venv/
 venv/
+env/
+node_modules/
 
-# OS
-Thumbs.db
+# Build and distribution artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+*.env.*
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+
+# OS specific
 .DS_Store
+Thumbs.db
+```
