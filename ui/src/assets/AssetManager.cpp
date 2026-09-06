@@ -6,6 +6,7 @@
 #include <fstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 static std::vector<std::string> splitCsv(const std::string& line)
@@ -160,87 +161,86 @@ Texture2D* AssetManager::relicSet(const std::string& id)
     return has(withNew) ? texture(withNew) : nullptr;
 }
 
-std::vector<std::string> AssetManager::enemyNameCandidates(
-    const std::string& displayName) const
+static std::string lowerEnemy(std::string value)
 {
-    std::vector<std::string> candidates;
-
-    if (displayName.empty())
-        return candidates;
-
-    auto add = [&](const std::string& value)
-    {
-        if (value.empty())
-            return;
-
-        if (std::find(candidates.begin(), candidates.end(), value) ==
-            candidates.end())
-        {
-            candidates.push_back(value);
-        }
-    };
-
-    // First try the filename exactly as supplied.
-    add(displayName + ".png");
-
-    // Lowercase version.
-    std::string lower = displayName;
-    std::transform(lower.begin(), lower.end(), lower.begin(),
+    std::transform(value.begin(), value.end(), value.begin(),
                    [](unsigned char c)
                    {
                        return static_cast<char>(std::tolower(c));
                    });
-    add(lower + ".png");
+    return value;
+}
 
-    // Replace filesystem-unfriendly punctuation/spaces with underscores.
-    std::string slug = lower;
+static std::string stripEnemyVariant(std::string value)
+{
+    value = lowerEnemy(std::move(value));
+    const size_t open = value.rfind(" (");
+    if (open != std::string::npos && !value.empty() && value.back() == ')')
+        value.erase(open);
+    return value;
+}
 
-    for (char& c : slug)
+std::vector<std::string> AssetManager::enemyNameCandidates(
+    const std::string& displayName) const
+{
+    std::vector<std::string> candidates;
+    if (displayName.empty())
+        return candidates;
+
+    auto add = [&](std::string value)
     {
-        const bool keep =
-            std::isalnum(static_cast<unsigned char>(c)) ||
-            c == '_' || c == '-';
+        if (value.empty())
+            return;
+        if (std::find(candidates.begin(), candidates.end(), value) == candidates.end())
+            candidates.push_back(std::move(value));
+    };
 
-        if (!keep)
-            c = '_';
-    }
-
-    // Collapse repeated underscores and trim them.
-    std::string compact;
-    bool previousUnderscore = false;
-
-    for (char c : slug)
+    auto addForms = [&](const std::string& name)
     {
-        if (c == '_')
+        const std::string lower = lowerEnemy(name);
+        add(lower + ".png");
+
+        std::string underscore = lower;
+        for (char& c : underscore)
         {
-            if (previousUnderscore)
-                continue;
+            if (c == ' ' || c == '\t')
+                c = '_';
+            else if (c == ':')
+                c = '_';
+        }
+        add(underscore + ".png");
 
-            previousUnderscore = true;
+        std::string hyphen = lower;
+        for (char& c : hyphen)
+            if (c == ' ' || c == '\t')
+                c = '-';
+        add(hyphen + ".png");
+
+        std::string compact;
+        bool lastUnderscore = false;
+        for (char c : underscore)
+        {
+            if (c == '_')
+            {
+                if (lastUnderscore)
+                    continue;
+                lastUnderscore = true;
+            }
+            else
+            {
+                lastUnderscore = false;
+            }
             compact.push_back(c);
         }
-        else
-        {
-            previousUnderscore = false;
-            compact.push_back(c);
-        }
-    }
+        while (!compact.empty() && compact.front() == '_') compact.erase(compact.begin());
+        while (!compact.empty() && compact.back() == '_') compact.pop_back();
+        add(compact + ".png");
+    };
 
-    while (!compact.empty() && compact.front() == '_')
-        compact.erase(compact.begin());
-
-    while (!compact.empty() && compact.back() == '_')
-        compact.pop_back();
-
-    add(compact + ".png");
-
-    // Common variant: spaces -> hyphens.
-    std::string hyphen = lower;
-    for (char& c : hyphen)
-        if (c == ' ')
-            c = '-';
-
-    add(hyphen + ".png");
+    addForms(displayName);
+    const std::string base = stripEnemyVariant(displayName);
+    if (base != lowerEnemy(displayName))
+        addForms(base);
 
     return candidates;
 }
@@ -249,12 +249,7 @@ Texture2D* AssetManager::enemy(
     const std::string& id,
     const std::string& displayName)
 {
-    // Enemy artwork is deliberately name-first. The asset manifest can contain
-    // unrelated entries keyed by the same numeric ID, while the current enemy
-    // pack is explicitly stored as <enemy name>.png.
-    const std::string cacheKey =
-        "__enemy__" + id;
-
+    const std::string cacheKey = "__enemy__" + id;
     const auto loaded = textures.find(cacheKey);
     if (loaded != textures.end())
         return &loaded->second;
@@ -262,19 +257,13 @@ Texture2D* AssetManager::enemy(
     const std::string enemyDirectory =
         joinPath(manifestDirectory, "prydwen_assets/enemies");
 
-    // The user stated the images are PNG files named after their enemies.
     for (const std::string& filename : enemyNameCandidates(displayName))
     {
         const std::string path = joinPath(enemyDirectory, filename);
-
-        if (FileExists(path.c_str()))
-        {
-            if (loadTextureAt(cacheKey, path))
-                return &textures[cacheKey];
-        }
+        if (FileExists(path.c_str()) && loadTextureAt(cacheKey, path))
+            return &textures[cacheKey];
     }
 
-    // Backward-compatible fallbacks for older packs.
     const std::vector<std::string> legacy = {
         "Monster_" + id + ".png",
         "Monster_" + id + ".webp",
@@ -285,19 +274,17 @@ Texture2D* AssetManager::enemy(
     for (const std::string& filename : legacy)
     {
         const std::string path = joinPath(enemyDirectory, filename);
-
-        if (FileExists(path.c_str()) &&
-            loadTextureAt(cacheKey, path))
-        {
+        if (FileExists(path.c_str()) && loadTextureAt(cacheKey, path))
             return &textures[cacheKey];
-        }
     }
 
-    TraceLog(LOG_WARNING,
-             "Enemy artwork not found for '%s' (id=%s)",
-             displayName.c_str(),
-             id.c_str());
-
+    static std::unordered_set<std::string> warned;
+    if (warned.insert(id).second)
+    {
+        TraceLog(LOG_WARNING,
+                 "Enemy artwork not found for '%s' (id=%s)",
+                 displayName.c_str(), id.c_str());
+    }
     return nullptr;
 }
 
