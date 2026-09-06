@@ -3,9 +3,9 @@
 #include "Screen.h"
 #include "../assets/AssetManager.h"
 #include "../data/CharacterDatabase.h"
-#include "../data/RelicSetDatabase.h"
-#include "../data/CharacterLoadout.h"
-#include "../data/GearRules.h"
+#include "../data/Relicsetdatabase.h"
+#include "../data/Characterloadout.h"
+#include "../data/Gearrules.h"
 
 #include <array>
 #include <string>

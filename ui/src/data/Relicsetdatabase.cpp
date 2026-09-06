@@ -1,4 +1,4 @@
-#include "RelicSetDatabase.h"
+#include "Relicsetdatabase.h"
 #include "../third_party/json.hpp"
 
 #include <fstream>
