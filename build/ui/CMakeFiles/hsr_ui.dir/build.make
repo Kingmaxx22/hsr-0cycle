@@ -400,7 +400,6 @@ ui/hsr_ui: raylib/raylib/libraylib.a
 ui/hsr_ui: /usr/local/lib/libpython3.12.so
 ui/hsr_ui: /usr/lib/x86_64-linux-gnu/libOpenGL.so
 ui/hsr_ui: /usr/lib/x86_64-linux-gnu/libGLX.so
-ui/hsr_ui: /usr/lib/x86_64-linux-gnu/libGLU.so
 ui/hsr_ui: /usr/lib/x86_64-linux-gnu/librt.a
 ui/hsr_ui: /usr/lib/x86_64-linux-gnu/libm.so
 ui/hsr_ui: /usr/lib/x86_64-linux-gnu/libX11.so

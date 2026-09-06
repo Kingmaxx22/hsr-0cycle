@@ -329,6 +329,82 @@ double calculateWeakenessMultiplier(const WeakenessConfig& config);
 double calculateWeakenessMultiplier(double weakenessPercent = 0.0);
 
 // ============================================================================
+// SECTION 9: CORE STAT TOTALS (HP / ATK / DEF / SPEED)
+// ============================================================================
+// HP Total    = (Character Base HP  + LC Base HP)  x (1 + HP%)  + Flat HP
+// ATK Total   = (Character Base ATK + LC Base ATK) x (1 + ATK%) + Flat ATK
+// DEF Total   = (Character Base DEF + LC Base DEF) x (1 + DEF%) + Flat DEF
+// Speed Total = Character Base Speed x (1 + Speed%) + Flat Speed
+//
+// Important rule: Light Cone BASE stats merge with character BASE stats FIRST,
+// before percentage bonuses are applied. Do not apply % bonuses to LC base
+// stats separately, or the result will be wrong.
+//
+// Inputs needed per stat: characterBase, lcBase (0 for Speed, LCs don't give base Speed),
+//                         percentBonus (sum of all % substats/buffs), flatBonus (sum of all flat substats/buffs)
+// Output: total value for HP, ATK, DEF, Speed
+
+struct CoreStatConfig {
+    double characterBase;    // Character's base stat value
+    double lightConeBase;    // Light Cone's base stat (0 for Speed, as LCs don't give base Speed)
+    double percentBonus;     // Sum of all % bonuses (substats, buffs, etc.) as decimal (e.g., 0.20 for 20%)
+    double flatBonus;        // Sum of all flat bonuses (substats, buffs, etc.)
+    
+    CoreStatConfig()
+        : characterBase(0.0)
+        , lightConeBase(0.0)
+        , percentBonus(0.0)
+        , flatBonus(0.0) {}
+};
+
+/**
+ * Calculates total HP.
+ * 
+ * HP Total = (Character Base HP + LC Base HP) x (1 + HP%) + Flat HP
+ * 
+ * @param config The HP configuration containing base values and bonuses
+ * @return The calculated total HP
+ */
+double calculateTotalHP(const CoreStatConfig& config);
+
+/**
+ * Calculates total ATK.
+ * 
+ * ATK Total = (Character Base ATK + LC Base ATK) x (1 + ATK%) + Flat ATK
+ * 
+ * @param config The ATK configuration containing base values and bonuses
+ * @return The calculated total ATK
+ */
+double calculateTotalATK(const CoreStatConfig& config);
+
+/**
+ * Calculates total DEF.
+ * 
+ * DEF Total = (Character Base DEF + LC Base DEF) x (1 + DEF%) + Flat DEF
+ * 
+ * @param config The DEF configuration containing base values and bonuses
+ * @return The calculated total DEF
+ */
+double calculateTotalDEF(const CoreStatConfig& config);
+
+/**
+ * Calculates total Speed.
+ * 
+ * Speed Total = Character Base Speed x (1 + Speed%) + Flat Speed
+ * Note: Light Cones do not provide base Speed, so lightConeBase should be 0.
+ * 
+ * @param config The Speed configuration containing base values and bonuses
+ * @return The calculated total Speed
+ */
+double calculateTotalSpeed(const CoreStatConfig& config);
+
+// Convenience overloads with individual parameters
+double calculateTotalHP(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
+double calculateTotalATK(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
+double calculateTotalDEF(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
+double calculateTotalSpeed(double characterBase, double percentBonus, double flatBonus);
+
+// ============================================================================
 // SECTION 1: MASTER DAMAGE FORMULA
 // ============================================================================
 // Outgoing DMG = Base DMG x DMG% Mult x DEF Mult x RES Mult x DMG Taken Mult 
