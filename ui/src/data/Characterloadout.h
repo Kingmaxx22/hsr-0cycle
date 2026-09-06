@@ -23,6 +23,11 @@ struct GearPiece
 
 struct CharacterLoadout
 {
+    // Light Cone equipped on this character
+    std::string lightConeId;
+    int lightConeSuperimposition = 1; // 1 to 5 (S1..S5)
+
+    // Gear
     std::array<GearPiece, static_cast<size_t>(GearSlot::Count)> gear;
 
     // true  = a single 4-piece relic set (Head/Hands/Body/Feet all match)

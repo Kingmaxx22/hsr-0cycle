@@ -35,8 +35,36 @@ void RelicEditorScreen::setCharacter(const std::string& id)
     characterId = id;
     focusedField = -1;
 
-    CharacterLoadout& loadout = loadouts[characterId]; // creates a default entry if new
-    ensureLoadoutDefaults(loadout);
+    if (!characterId.empty())
+    {
+        CharacterLoadout& loadout = loadouts[characterId];
+        ensureLoadoutDefaults(loadout);
+    }
+}
+
+void RelicEditorScreen::setTeamContext(const std::array<std::string, 4>& team,
+                                       const std::string& activeCharacterId)
+{
+    teamMembers = team;
+    focusedField = -1;
+
+    if (!activeCharacterId.empty())
+    {
+        setCharacter(activeCharacterId);
+    }
+    else
+    {
+        std::string found;
+        for (const auto& member : teamMembers)
+        {
+            if (!member.empty())
+            {
+                found = member;
+                break;
+            }
+        }
+        setCharacter(found);
+    }
 }
 
 bool RelicEditorScreen::consumeBackRequest()
@@ -64,7 +92,10 @@ Rectangle RelicEditorScreen::twoPieceModeButtonBounds() const
 
 Rectangle RelicEditorScreen::relicSetAButtonBounds() const
 {
-    const CharacterLoadout& loadout = loadouts.at(characterId);
+    if (characterId.empty() || loadouts.find(characterId) == loadouts.end())
+        return Rectangle{310.0f, 197.0f, 470.0f, 34.0f};
+
+    const CharacterLoadout& loadout = loadouts.find(characterId)->second;
     float width = loadout.relicFourPiece ? 470.0f : 225.0f;
     return Rectangle{310.0f, 197.0f, width, 34.0f};
 }
@@ -118,19 +149,52 @@ void RelicEditorScreen::update(float dt)
 {
     (void)dt;
 
+    Vector2 mouse = GetMousePosition();
+    bool pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+
     if (characterId.empty())
+    {
+        if (pressed)
+        {
+            if (CheckCollisionPointRec(mouse, backButtonBounds()))
+                backRequested = true;
+
+            Rectangle emptyPromptBtn{310.0f, 190.0f, 200.0f, 36.0f};
+            if (CheckCollisionPointRec(mouse, emptyPromptBtn))
+                backRequested = true;
+        }
         return;
+    }
 
     CharacterLoadout& loadout = loadouts[characterId];
 
-    Vector2 mouse = GetMousePosition();
-    bool pressed = IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     bool clickedOnValueField = false;
 
     if (pressed)
     {
         if (CheckCollisionPointRec(mouse, backButtonBounds()))
             backRequested = true;
+
+        // Header Team Switcher Tabs
+        float tabX = 410.0f;
+        for (int i = 0; i < 4; ++i)
+        {
+            if (!teamMembers[i].empty())
+            {
+                const CharacterInfo* memberInfo = characters.get(teamMembers[i]);
+                std::string label = TextFormat("[%d] %s", i + 1, memberInfo ? memberInfo->name.c_str() : teamMembers[i].c_str());
+                int textW = MeasureText(label.c_str(), 14);
+                float tabW = static_cast<float>(textW) + 24.0f;
+                Rectangle tabRect{tabX, 68.0f, tabW, 26.0f};
+
+                if (CheckCollisionPointRec(mouse, tabRect))
+                {
+                    setCharacter(teamMembers[i]);
+                    return;
+                }
+                tabX += tabW + 8.0f;
+            }
+        }
 
         if (CheckCollisionPointRec(mouse, fourPieceModeButtonBounds()))
             loadout.relicFourPiece = true;
@@ -151,17 +215,14 @@ void RelicEditorScreen::update(float dt)
         {
             GearSlot slot = static_cast<GearSlot>(i);
             GearPiece& piece = loadout.gear[i];
-            Rectangle card = gearCardBounds(slot);
 
             const auto& mainOptions = mainStatOptions(slot);
-            Rectangle mainRect{card.x + 14.0f, card.y + 34.0f, card.width - 28.0f, 28.0f};
+            Rectangle mainRect{gearCardBounds(slot).x + 14.0f, gearCardBounds(slot).y + 34.0f, gearCardBounds(slot).width - 28.0f, 28.0f};
 
             if (mainOptions.size() > 1 && CheckCollisionPointRec(mouse, mainRect))
             {
                 piece.mainStat = nextStatOption(mainOptions, piece.mainStat);
 
-                // A substat can't duplicate the piece's main stat — clear
-                // any row that now collides with the newly picked one.
                 for (auto& s : piece.substats)
                     if (s.statKey == piece.mainStat)
                         s.statKey.clear();
@@ -169,6 +230,7 @@ void RelicEditorScreen::update(float dt)
 
             for (int row = 0; row < 4; ++row)
             {
+                Rectangle card = gearCardBounds(slot);
                 float rowY = card.y + 70.0f + row * 32.0f;
                 Rectangle typeRect{card.x + 14.0f, rowY, 180.0f, 26.0f};
                 Rectangle valueRect{card.x + 202.0f, rowY, 134.0f, 26.0f};
@@ -215,7 +277,17 @@ void RelicEditorScreen::draw()
 {
     if (characterId.empty())
     {
-        DrawText("No character selected.", 320, 200, 20, RAYWHITE);
+        DrawText("Relics & Planar Ornaments", 310, 30, 34, RAYWHITE);
+        DrawLine(310, 105, GetScreenWidth() - 30, 105, Color{48, 52, 64, 255});
+
+        DrawText("No character selected from Team Builder.", 310, 130, 18, Color{210, 180, 140, 255});
+        DrawText("Please add a character to your team in Team Builder first.", 310, 158, 15, kDimText);
+
+        Rectangle backBtn{310.0f, 190.0f, 200.0f, 36.0f};
+        DrawRectangleRounded(backBtn, 0.2f, 8, kAccentBg);
+        DrawRectangleRoundedLines(backBtn, 0.2f, 8, kAccentBorder);
+        DrawText("< Go to Team Builder", static_cast<int>(backBtn.x + 18.0f),
+                 static_cast<int>(backBtn.y + 10.0f), 15, RAYWHITE);
         return;
     }
 
@@ -237,15 +309,48 @@ void RelicEditorScreen::drawHeader()
     DrawText("< Back", static_cast<int>(back.x + 14.0f), static_cast<int>(back.y + 9.0f),
               15, RAYWHITE);
 
-    DrawText(displayName.c_str(), 410, 30, 30, RAYWHITE);
-    DrawText("Relics & Planar Ornaments", 412, 68, 15, kDimText);
+    DrawText(displayName.c_str(), 410, 28, 28, RAYWHITE);
+    if (info)
+    {
+        std::string sub = info->path + " | " + info->element;
+        DrawText(sub.c_str(), 410 + MeasureText(displayName.c_str(), 28) + 16, 36, 16, kDimText);
+    }
+
+    // Draw team member switcher tabs
+    float tabX = 410.0f;
+    int teamMemberCount = 0;
+    for (int i = 0; i < 4; ++i)
+    {
+        if (!teamMembers[i].empty())
+        {
+            teamMemberCount++;
+            bool isCurrent = (teamMembers[i] == characterId);
+            const CharacterInfo* memberInfo = characters.get(teamMembers[i]);
+            std::string label = TextFormat("[%d] %s", i + 1, memberInfo ? memberInfo->name.c_str() : teamMembers[i].c_str());
+            int textW = MeasureText(label.c_str(), 14);
+            float tabW = static_cast<float>(textW) + 24.0f;
+            Rectangle tabRect{tabX, 68.0f, tabW, 26.0f};
+
+            DrawRectangleRounded(tabRect, 0.25f, 8, isCurrent ? kAccentBg : kPanelBg);
+            DrawRectangleRoundedLines(tabRect, 0.25f, 8, isCurrent ? kAccentBorder : kPanelBorder);
+            DrawText(label.c_str(), static_cast<int>(tabRect.x + 12.0f),
+                     static_cast<int>(tabRect.y + 6.0f), 14, isCurrent ? RAYWHITE : kDimText);
+
+            tabX += tabW + 8.0f;
+        }
+    }
+
+    if (teamMemberCount == 0)
+    {
+        DrawText("Relics & Planar Ornaments", 412, 68, 15, kDimText);
+    }
 
     DrawLine(310, 105, GetScreenWidth() - 30, 105, Color{48, 52, 64, 255});
 }
 
 void RelicEditorScreen::drawSetPanel()
 {
-    const CharacterLoadout& loadout = loadouts.at(characterId);
+    CharacterLoadout& loadout = loadouts[characterId];
 
     DrawText("RELIC SET", 310, 130, 15, kDimText);
 
@@ -253,14 +358,14 @@ void RelicEditorScreen::drawSetPanel()
     DrawRectangleRounded(fourBtn, 0.2f, 8, loadout.relicFourPiece ? kAccentBg : kPanelBg);
     DrawRectangleRoundedLines(fourBtn, 0.2f, 8,
         loadout.relicFourPiece ? kAccentBorder : kPanelBorder);
-    DrawText("4-PIECE", static_cast<int>(fourBtn.x + 14.0f), static_cast<int>(fourBtn.y + 8.0f),
+    DrawText("4-PIECE", static_cast<int>(fourBtn.x + 14.0f), static_cast<int>(fourBtn.y + 8.0f),\
               14, loadout.relicFourPiece ? RAYWHITE : kDimText);
 
     Rectangle twoBtn = twoPieceModeButtonBounds();
     DrawRectangleRounded(twoBtn, 0.2f, 8, !loadout.relicFourPiece ? kAccentBg : kPanelBg);
     DrawRectangleRoundedLines(twoBtn, 0.2f, 8,
         !loadout.relicFourPiece ? kAccentBorder : kPanelBorder);
-    DrawText("2 + 2", static_cast<int>(twoBtn.x + 18.0f), static_cast<int>(twoBtn.y + 8.0f),
+    DrawText("2 + 2", static_cast<int>(twoBtn.x + 18.0f), static_cast<int>(twoBtn.y + 8.0f),\
               14, !loadout.relicFourPiece ? RAYWHITE : kDimText);
 
     Rectangle setA = relicSetAButtonBounds();
@@ -291,7 +396,7 @@ void RelicEditorScreen::drawSetPanel()
 
 void RelicEditorScreen::drawGearCard(GearSlot slot)
 {
-    const CharacterLoadout& loadout = loadouts.at(characterId);
+    CharacterLoadout& loadout = loadouts[characterId];
     const GearPiece& piece = loadout.gear[static_cast<size_t>(slot)];
     Rectangle card = gearCardBounds(slot);
 

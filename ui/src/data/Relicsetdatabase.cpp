@@ -52,3 +52,29 @@ std::vector<const RelicSetInfo*> RelicSetDatabase::byCategory(const std::string&
             result.push_back(&s);
     return result;
 }
+
+const RelicSetInfo* RelicSetDatabase::getById(const std::string& id) const
+{
+    for (const auto& s : sets)
+        if (s.id == id)
+            return &s;
+    return nullptr;
+}
+
+const RelicSetInfo* RelicSetDatabase::getByName(const std::string& name) const
+{
+    for (const auto& s : sets)
+        if (s.name == name)
+            return &s;
+    return nullptr;
+}
+
+const RelicSetInfo* RelicSetDatabase::get(const std::string& idOrName) const
+{
+    if (idOrName.empty())
+        return nullptr;
+    const auto* byId = getById(idOrName);
+    if (byId)
+        return byId;
+    return getByName(idOrName);
+}

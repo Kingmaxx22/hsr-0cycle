@@ -20,9 +20,12 @@ bool App::initialize()
 
     if (!relicSets.load(HSR_ENGINE_DATA_DIR))
     {
-        // Not fatal -- the gear editor still works, it just won't offer any
-        // named relic/planar sets to cycle through.
         TraceLog(LOG_WARNING, "Failed to load relic set rules from: %s", HSR_ENGINE_DATA_DIR);
+    }
+
+    if (!lightCones.load(HSR_ENGINE_DATA_DIR))
+    {
+        TraceLog(LOG_WARNING, "Failed to load light cones from: %s", HSR_ENGINE_DATA_DIR);
     }
 
     teamBuilder = std::make_unique<TeamBuilderScreen>(assets, characters);
@@ -34,14 +37,24 @@ bool App::initialize()
     relicEditor = std::make_unique<RelicEditorScreen>(assets, characters, relicSets, loadouts);
     relicEditor->initialize();
 
+    lightConeScreen = std::make_unique<LightConeScreen>(assets, characters, lightCones, loadouts);
+    lightConeScreen->initialize();
+
     return true;
 }
 
 void App::goToRelicEditor(const std::string& characterId)
 {
-    relicEditor->setCharacter(characterId);
+    relicEditor->setTeamContext(teamBuilder->getTeam(), characterId);
     activeView = ActiveView::RelicEditor;
     activeNav = 3; // RELICS
+}
+
+void App::goToLightConeScreen(const std::string& characterId)
+{
+    lightConeScreen->setTeamContext(teamBuilder->getTeam(), characterId);
+    activeView = ActiveView::LightCone;
+    activeNav = 2; // LIGHT CONES
 }
 
 void App::run()
@@ -55,6 +68,7 @@ void App::run()
             case ActiveView::TeamBuilder: teamBuilder->update(dt); break;
             case ActiveView::RelicRoster: relicRoster->update(dt); break;
             case ActiveView::RelicEditor: relicEditor->update(dt); break;
+            case ActiveView::LightCone:   lightConeScreen->update(dt); break;
         }
 
         BeginDrawing();
@@ -66,10 +80,13 @@ void App::run()
             activeView = ActiveView::TeamBuilder;
             activeNav = 0;
         }
+        else if (navClick == 2)
+        {
+            goToLightConeScreen(teamBuilder->getSelectedCharacter());
+        }
         else if (navClick == 3)
         {
-            activeView = ActiveView::RelicRoster;
-            activeNav = 3;
+            goToRelicEditor(teamBuilder->getSelectedCharacter());
         }
         else if (navClick >= 0)
         {
@@ -100,8 +117,18 @@ void App::run()
                 relicEditor->draw();
                 if (relicEditor->consumeBackRequest())
                 {
-                    activeView = ActiveView::RelicRoster;
-                    activeNav = 3;
+                    activeView = ActiveView::TeamBuilder;
+                    activeNav = 0;
+                }
+                break;
+            }
+            case ActiveView::LightCone:
+            {
+                lightConeScreen->draw();
+                if (lightConeScreen->consumeBackRequest())
+                {
+                    activeView = ActiveView::TeamBuilder;
+                    activeNav = 0;
                 }
                 break;
             }
@@ -113,6 +140,7 @@ void App::run()
 
 void App::shutdown()
 {
+    lightConeScreen.reset();
     relicEditor.reset();
     relicRoster.reset();
     teamBuilder.reset();

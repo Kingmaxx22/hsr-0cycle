@@ -19,6 +19,10 @@ public:
     std::vector<const RelicSetInfo*> byCategory(const std::string& category) const;
     const std::vector<RelicSetInfo>& all() const { return sets; }
 
+    const RelicSetInfo* getById(const std::string& id) const;
+    const RelicSetInfo* getByName(const std::string& name) const;
+    const RelicSetInfo* get(const std::string& idOrName) const;
+
 private:
     std::vector<RelicSetInfo> sets;
 };

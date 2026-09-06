@@ -25,6 +25,19 @@ public:
     // clicked this frame, requesting that character's gear editor be opened.
     bool consumeEditorRequest(std::string& outCharacterId);
 
+    const std::array<std::string, 4>& getTeam() const { return team; }
+    int getSelectedSlot() const { return selectedSlot; }
+
+    std::string getSelectedCharacter() const
+    {
+        if (selectedSlot >= 0 && selectedSlot < 4 && !team[selectedSlot].empty())
+            return team[selectedSlot];
+        for (const auto& id : team)
+            if (!id.empty())
+                return id;
+        return "";
+    }
+
 private:
     void drawHeader();
     void drawTeamSlots();
