@@ -484,7 +484,7 @@ void LightConeScreen::drawEquippedPanel()
     DrawRectangleRounded(imgBox, 0.06f, 8, Color{20, 22, 30, 255});
     DrawRectangleRoundedLines(imgBox, 0.06f, 8, rColor);
 
-    Texture2D* tex = assets.texture(lc->assetId);
+        Texture2D* tex = assets.lightCone(lc->assetId);
     if (tex)
     {
         Rectangle src{0, 0, static_cast<float>(tex->width), static_cast<float>(tex->height)};
@@ -623,7 +623,7 @@ void LightConeScreen::drawLibrary()
         Rectangle imgBox{cardRect.x + 8.0f, cardRect.y + 8.0f, cardRect.width - 16.0f, 115.0f};
         DrawRectangleRounded(imgBox, 0.05f, 4, Color{20, 22, 28, 255});
 
-        Texture2D* tex = assets.texture(lc->assetId);
+        Texture2D* tex = assets.lightCone(lc->assetId);
         if (tex)
         {
             Rectangle src{0, 0, static_cast<float>(tex->width), static_cast<float>(tex->height)};

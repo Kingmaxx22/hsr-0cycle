@@ -160,6 +160,37 @@ Texture2D* AssetManager::character(const std::string& id)
     return nullptr;
 }
 
+// Light cone slugs whose engine-side name disagrees with the asset-scrape
+// filename for a reason other than the generic "New" badge suffix below.
+static const std::unordered_map<std::string, std::string>& lightConeAliases()
+{
+    static const std::unordered_map<std::string, std::string> aliases = {};
+    return aliases;
+}
+
+Texture2D* AssetManager::lightCone(const std::string& id)
+{
+    // Direct hit first.
+    if (has(id))
+        return texture(id);
+
+    // Known one-off mismatches.
+    auto& aliases = lightConeAliases();
+    auto aliasIt = aliases.find(id);
+    if (aliasIt != aliases.end() && has(aliasIt->second))
+        return texture(aliasIt->second);
+
+    // The Prydwen scraper occasionally bakes a "NEW" badge onto a recently
+    // added light cone's filename (e.g. reforged_in_hellfire ->
+    // reforged_in_hellfirenew), while the engine-side slug never picks up
+    // that suffix. Try the "new"-suffixed id as a fallback before giving up.
+    std::string withNew = id + "new";
+    if (has(withNew))
+        return texture(withNew);
+
+    return nullptr;
+}
+
 bool AssetManager::loadTextureFor(const std::string& id)
 {
     const AssetEntry* asset = entry(id);

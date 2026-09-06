@@ -23,6 +23,7 @@ public:
 
     Texture2D* texture(const std::string& id);
     Texture2D* character(const std::string& id);
+    Texture2D* lightCone(const std::string& id);
 
     void unloadAll();
 
