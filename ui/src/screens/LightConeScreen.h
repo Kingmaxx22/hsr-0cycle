@@ -4,7 +4,7 @@
 #include "../assets/AssetManager.h"
 #include "../data/CharacterDatabase.h"
 #include "../data/LightConeDatabase.h"
-#include "../data/CharacterLoadout.h"
+#include "../data/Characterloadout.h"
 
 #include <array>
 #include <string>

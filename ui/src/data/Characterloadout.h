@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GearRules.h"
+#include "Gearrules.h"
 
 #include <array>
 #include <string>

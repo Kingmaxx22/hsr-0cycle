@@ -52,6 +52,10 @@ bool App::initialize()
         std::make_unique<EnemiesScreen>(assets, enemies);
     enemiesScreen->initialize();
 
+    simulationScreen =
+        std::make_unique<SimulationScreen>(assets, enemies);
+    simulationScreen->initialize();
+
     return true;
 }
 
@@ -77,6 +81,17 @@ void App::goToEnemiesScreen()
     activeNav = 4;
 }
 
+void App::goToSimulationScreen()
+{
+    // Pass selected enemy from EnemiesScreen if available
+    std::string selectedEnemy = enemiesScreen->getSelectedEnemyId();
+    if (!selectedEnemy.empty()) {
+        simulationScreen->setSelectedEnemy(selectedEnemy);
+    }
+    activeView = ActiveView::Simulation;
+    activeNav = 5;
+}
+
 void App::run()
 {
     while (!WindowShouldClose())
@@ -90,6 +105,7 @@ void App::run()
             case ActiveView::RelicEditor: relicEditor->update(dt); break;
             case ActiveView::LightCone:   lightConeScreen->update(dt); break;
             case ActiveView::Enemies:     enemiesScreen->update(dt); break;
+            case ActiveView::Simulation:  simulationScreen->update(dt); break;
         }
 
         BeginDrawing();
@@ -113,6 +129,10 @@ void App::run()
         else if (navClick == 4)
         {
             goToEnemiesScreen();
+        }
+        else if (navClick == 5)
+        {
+            goToSimulationScreen();
         }
         else if (navClick >= 0)
         {
@@ -172,6 +192,16 @@ void App::run()
                     activeNav = 0;
                 }
                 break;
+
+            case ActiveView::Simulation:
+                simulationScreen->draw();
+
+                if (simulationScreen->consumeBackRequest())
+                {
+                    activeView = ActiveView::TeamBuilder;
+                    activeNav = 0;
+                }
+                break;
         }
 
         EndDrawing();
@@ -180,6 +210,7 @@ void App::run()
 
 void App::shutdown()
 {
+    simulationScreen.reset();
     enemiesScreen.reset();
     lightConeScreen.reset();
     relicEditor.reset();
