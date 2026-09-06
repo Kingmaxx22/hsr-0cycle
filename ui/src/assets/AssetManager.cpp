@@ -163,6 +163,10 @@ Texture2D* AssetManager::relicSet(const std::string& id)
 
 static std::string lowerEnemy(std::string value)
 {
+    // Strip stray literal quote characters from scraped names before
+    // anything else — your asset files never contain one.
+    value.erase(std::remove(value.begin(), value.end(), '"'), value.end());
+
     std::transform(value.begin(), value.end(), value.begin(),
                    [](unsigned char c)
                    {
