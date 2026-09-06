@@ -1,44 +1,38 @@
 ```
-# Compiled Python files
-*.pyc
-__pycache__/
+# Build artifacts
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+*.out
+
+# CMake build directory (common pattern)
+build/
 
 # Dependencies
-.venv/
 venv/
-env/
-node_modules/
-
-# Build and distribution artifacts
-build/
-dist/
+.venv/
+__pycache__/
 *.egg-info/
 
-# Logs
+# Logs and temporary files
 *.log
+*.tmp
+*.swp
 
-# Environment variables
+# Editors
+.vscode/
+.idea/
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Environment files
 .env
 .env.local
 *.env.*
-
-# Editor/IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Coverage reports
-.coverage
-coverage/
-htmlcov/
-
-# Testing
-.pytest_cache/
-.mypy_cache/
-
-# OS specific
-.DS_Store
-Thumbs.db
 ```

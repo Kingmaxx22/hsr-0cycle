@@ -2,16 +2,17 @@
 
 #include "assets/AssetManager.h"
 #include "data/CharacterDatabase.h"
-#include "data/RelicSetDatabase.h"
+#include "data/Relicsetdatabase.h"
 #include "data/LightConeDatabase.h"
-#include "data/CharacterLoadout.h"
+#include "data/Characterloadout.h"
 #include "data/EnemyDatabase.h"
 #include "widgets/Sidebar.h"
 #include "screens/TeamBuilderScreen.h"
-#include "screens/RelicRosterScreen.h"
-#include "screens/RelicEditorScreen.h"
+#include "screens/Relicrosterscreen.h"
+#include "screens/Reliceditorscreen.h"
 #include "screens/LightConeScreen.h"
 #include "screens/EnemiesScreen.h"
+#include "screens/SimulationScreen.h"
 
 #include <memory>
 #include <string>
@@ -36,12 +37,14 @@ private:
         RelicRoster,
         RelicEditor,
         LightCone,
-        Enemies
+        Enemies,
+        Simulation
     };
 
     void goToRelicEditor(const std::string& characterId);
     void goToLightConeScreen(const std::string& characterId);
     void goToEnemiesScreen();
+    void goToSimulationScreen();
 
     AssetManager assets;
     CharacterDatabase characters;
@@ -59,4 +62,5 @@ private:
     std::unique_ptr<RelicEditorScreen> relicEditor;
     std::unique_ptr<LightConeScreen> lightConeScreen;
     std::unique_ptr<EnemiesScreen> enemiesScreen;
+    std::unique_ptr<SimulationScreen> simulationScreen;
 };
