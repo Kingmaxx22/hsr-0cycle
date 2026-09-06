@@ -2,6 +2,7 @@
 #define DAMAGE_CALCULATOR_H
 
 #include <string>
+#include <vector>
 
 namespace hsr {
 namespace damage {
@@ -51,34 +52,120 @@ double calculateBaseDamage(
 );
 
 // ============================================================================
-// SECTION 3: DEF MULTIPLIER CALCULATION
+// SECTION 3: DMG% MULTIPLIER CALCULATION
 // ============================================================================
-// DEF Mult = (Attacker Level + 20) / [(Attacker Level + 20) + (Enemy DEF x (1 - DEF Ignore))]
+// DMG% Mult = 100% + Elemental DMG% + All-Type DMG% + DoT DMG% + Other DMG%
 //
-// This will be implemented in the next section.
+// Rule: only sum the terms that are actually active/relevant for the current
+// calculation context (e.g. a conditional buff like "+20% DMG vs Burning enemies"
+// should only be included if that condition is currently true).
 
-struct DefenseMultiplierConfig {
-    int attackerLevel;
-    int enemyDEF;
-    double defIgnore;  // DEF Ignore as decimal (e.g., 0.20 for 20%)
+struct ConditionalDMGBuff {
+    double dmgPercent;     // DMG% bonus as decimal (e.g., 0.20 for 20%)
+    bool isActive;         // Whether this conditional buff is currently active
     
-    DefenseMultiplierConfig()
-        : attackerLevel(80)  // Default max level
-        , enemyDEF(0)
-        , defIgnore(0.0) {}
+    ConditionalDMGBuff()
+        : dmgPercent(0.0)
+        , isActive(false) {}
+    
+    ConditionalDMGBuff(double percent, bool active)
+        : dmgPercent(percent)
+        , isActive(active) {}
 };
 
+struct DMGPercentMultiplierConfig {
+    double elementalDMG;       // Elemental DMG% bonus (e.g., Fire DMG Boost)
+    double allTypeDMG;         // All-Type DMG% bonus
+    double dotDMG;             // DoT DMG% bonus (only used when calculating DoT)
+    std::vector<ConditionalDMGBuff> otherDMG;  // Array of conditional buffs
+    
+    DMGPercentMultiplierConfig()
+        : elementalDMG(0.0)
+        , allTypeDMG(0.0)
+        , dotDMG(0.0) {}
+};
+
+/**
+ * Calculates the DMG% multiplier.
+ * 
+ * DMG% Mult = 100% + Elemental DMG% + All-Type DMG% + DoT DMG% + Other DMG%
+ * Only active conditional buffs are included.
+ * 
+ * @param config The DMG% multiplier configuration
+ * @param includeDotDMG Whether to include DoT DMG% (true if calculating DoT damage)
+ * @return The calculated DMG% multiplier as a decimal (e.g., 1.359 for 35.9% bonus)
+ */
+double calculateDMGPercentMultiplier(const DMGPercentMultiplierConfig& config, bool includeDotDMG = false);
+
+// Convenience overload
+double calculateDMGPercentMultiplier(
+    double elementalDMG,
+    double allTypeDMG,
+    double dotDMG,
+    const std::vector<ConditionalDMGBuff>& otherDMG,
+    bool includeDotDMG = false
+);
+
+// ============================================================================
+// SECTION 4: DEF MULTIPLIER CALCULATION
+// ============================================================================
+// DEF Mult = 100% - [DEF / (DEF + 200 + 10 x Attacker Level)]
+//
+// DEF = Base DEF x (100% + DEF% - (DEF Reduction + DEF Ignore)) + Flat DEF
+//
+// Rule: DEF cannot go below 0 (clamp to 0 minimum before plugging into DEF Mult formula).
+
+struct DefenseMultiplierConfig {
+    // Attacker info
+    int attackerLevel;
+    
+    // Enemy base DEF
+    double enemyBaseDEF;
+    
+    // Enemy's own DEF buffs (usually 0 for enemies)
+    double enemyDEFPercent;
+    
+    // Debuffs on enemy
+    double defReductionPercent;  // DEF Reduction% from debuffs
+    double defIgnorePercent;     // DEF Ignore% from character effects
+    
+    // Flat DEF reduction (rare)
+    double flatDEFReduction;
+    
+    DefenseMultiplierConfig()
+        : attackerLevel(80)      // Default max level
+        , enemyBaseDEF(0.0)
+        , enemyDEFPercent(0.0)
+        , defReductionPercent(0.0)
+        , defIgnorePercent(0.0)
+        , flatDEFReduction(0.0) {}
+};
+
+/**
+ * Calculates the Defense multiplier.
+ * 
+ * DEF = Base DEF x (100% + DEF% - (DEF Reduction + DEF Ignore)) + Flat DEF
+ * DEF Mult = 100% - [DEF / (DEF + 200 + 10 x Attacker Level)]
+ * 
+ * DEF is clamped to 0 minimum before calculating the multiplier.
+ * 
+ * @param config The defense multiplier configuration
+ * @return The calculated DEF multiplier as a decimal
+ */
 double calculateDefenseMultiplier(const DefenseMultiplierConfig& config);
 
 // Convenience overload
 double calculateDefenseMultiplier(
     int attackerLevel,
-    int enemyDEF,
-    double defIgnore = 0.0
+    double enemyBaseDEF,
+    double enemyDEFPercent = 0.0,
+    double defReductionPercent = 0.0,
+    double defIgnorePercent = 0.0,
+    double flatDEFReduction = 0.0
 );
 
 // ============================================================================
-// SECTION 4: RESISTANCE MULTIPLIER CALCULATION
+// SECTION 5: RESISTANCE MULTIPLIER CALCULATION
 // ============================================================================
 // RES Mult calculation based on enemy resistance and RES Penetration
 //
@@ -105,7 +192,7 @@ double calculateResistanceMultiplier(
 );
 
 // ============================================================================
-// SECTION 5: DMG TAKEN MULTIPLIER CALCULATION
+// SECTION 6: DMG TAKEN MULTIPLIER CALCULATION
 // ============================================================================
 // DMG Taken Mult = 1 + sum of all DMG Taken buffs on enemy
 //
@@ -124,7 +211,7 @@ double calculateDamageTakenMultiplier(const DamageTakenConfig& config);
 double calculateDamageTakenMultiplier(double dmgTakenBuff = 0.0);
 
 // ============================================================================
-// SECTION 6: UNIVERSAL DMG REDUCTION CALCULATION
+// SECTION 7: UNIVERSAL DMG REDUCTION CALCULATION
 // ============================================================================
 // Universal DMG Reduction Mult = 1 - sum of all universal damage reductions
 //
@@ -143,7 +230,7 @@ double calculateUniversalDamageReductionMultiplier(const UniversalDamageReductio
 double calculateUniversalDamageReductionMultiplier(double universalReduction = 0.0);
 
 // ============================================================================
-// SECTION 7: WEAKEN MULTIPLIER CALCULATION
+// SECTION 8: WEAKEN MULTIPLIER CALCULATION
 // ============================================================================
 // Weaken Mult = 1 - Weaken DMG Reduction
 //
@@ -188,6 +275,7 @@ struct MasterDamageConfig {
 
 struct DamageResult {
     double baseDamage;
+    double dmgPercentMultiplier;
     double defenseMultiplier;
     double resistanceMultiplier;
     double damageTakenMultiplier;
@@ -197,6 +285,7 @@ struct DamageResult {
     
     DamageResult()
         : baseDamage(0.0)
+        , dmgPercentMultiplier(1.0)
         , defenseMultiplier(1.0)
         , resistanceMultiplier(1.0)
         , damageTakenMultiplier(1.0)
