@@ -48,3 +48,7 @@ dist/
 # Python cache
 __pycache__/
 *.pyc
+
+# Large game asset collections
+ui/assets/prydwen_assets/
+images/
