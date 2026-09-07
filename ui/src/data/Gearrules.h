@@ -139,6 +139,42 @@ inline const std::vector<double>& substatRollValues5Star(const std::string& key)
     return empty;
 }
 
+// 5-star maximum main-stat values at max enhancement (game constants).
+// Used ONLY as editable defaults: the player can overwrite any value in
+// the relic editor (Sec 22.8 — manual configuration always wins).
+inline double mainStatMaxValue(const std::string& key)
+{
+    if (key == "hp") return 705.0;
+    if (key == "atk") return 352.0;
+    if (key == "hp_pct") return 43.2;
+    if (key == "atk_pct") return 43.2;
+    if (key == "def_pct") return 54.0;
+    if (key == "crit_rate_pct") return 32.4;
+    if (key == "crit_dmg_pct") return 64.8;
+    if (key == "outgoing_healing_pct") return 34.56;
+    if (key == "effect_hit_rate_pct") return 43.2;
+    if (key == "break_effect_pct") return 64.8;
+    if (key == "spd") return 25.0;
+    if (key == "physical_dmg_pct") return 38.4;
+    if (key == "fire_dmg_pct") return 38.4;
+    if (key == "ice_dmg_pct") return 38.4;
+    if (key == "lightning_dmg_pct") return 38.4;
+    if (key == "wind_dmg_pct") return 38.4;
+    if (key == "quantum_dmg_pct") return 38.4;
+    if (key == "imaginary_dmg_pct") return 38.4;
+    if (key == "energy_regen_pct") return 19.44;
+    return 0.0;
+}
+
+inline bool isPercentStatKey(const std::string& key)
+{
+    // Percent stats are entered/displayed as percent-numbers ("43.2" + "%")
+    // and divided by 100 when resolved. Matches the relic editor renderer.
+    // Flat stats are "hp", "atk", "def", "spd" (no suffix).
+    return key.size() > 4 &&
+           key.compare(key.size() - 4, 4, "_pct") == 0;
+}
+
 inline std::string statLabel(const std::vector<StatOption>& options, const std::string& key)
 {
     for (const auto& o : options)

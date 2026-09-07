@@ -201,10 +201,14 @@ enum class EnemyVulnerabilityType {
 struct ResistanceMultiplierConfig {
     EnemyResistanceType resistanceType;  // Determines base RES value
     double resPenetration;               // Character's RES Penetration (e.g., 0.20 for 20%)
-    
+    // Exact base RES override (Sec 21.3: enemy DB values). >= 0 wins over
+    // the type bucket; < 0 (default) keeps bucket behavior.
+    double explicitBaseRES;
+
     ResistanceMultiplierConfig()
         : resistanceType(EnemyResistanceType::Neutral)  // Default 20% base RES
-        , resPenetration(0.0) {}
+        , resPenetration(0.0)
+        , explicitBaseRES(-1.0) {}
 };
 
 struct VulnerabilityConfig {
@@ -332,6 +336,18 @@ double calculateVulnerabilityMultiplier(double sumVULN, EnemyVulnerabilityType v
 
 // Convenience overload with just sumVULN% (standard, capped)
 double calculateVulnerabilityMultiplier(double sumVULN);
+
+/**
+ * Expected-value Crit multiplier (Section 21.4).
+ *
+ * critMult = 1 + clamp(critRate, 0, 1) x max(critDmg, 0)
+ *
+ * This is the average-damage convention: over many hits, expected damage
+ * scales by this factor. It is applied at the engine layer (outside the
+ * Section 1 master formula, which has no crit term) and exposed as an
+ * intermediate for debugging/display.
+ */
+double calculateCritMultiplier(double critRate, double critDmg);
 double calculateEffectHitRate(const EffectHitRateConfig& config);
 
 // Convenience overload with individual parameters
@@ -645,14 +661,55 @@ struct DamageResult {
 
 /**
  * Calculates the full outgoing damage using the master formula.
- * 
- * Outgoing DMG = Base DMG x DMG% Mult x DEF Mult x RES Mult x DMG Taken Mult 
+ *
+ * Outgoing DMG = Base DMG x DMG% Mult x DEF Mult x RES Mult x DMG Taken Mult
  *                x Universal DMG Reduction Mult x Weakeness Mult
- * 
+ *
  * @param config The complete damage configuration
  * @return DamageResult containing all intermediate values and final damage
  */
 DamageResult calculateOutgoingDamage(const MasterDamageConfig& config);
+
+// ============================================================================
+// SECTION 12/10: RELATIVE-GAIN COMPARISON TOOLS (declarations for the
+// implementations already in DamageCalculator.cpp)
+// ============================================================================
+struct DefenseShredComparison {
+    double currentMultiplier;
+    double compareMultiplier;
+    double relativeGainPercent;
+};
+
+DefenseShredComparison calculateDefenseShredComparison(
+    double enemyTotalDEF,
+    double shredPercent,
+    double compareShredPercent,
+    int attackerLevel,
+    bool isPlightDifficulty);
+
+struct ResistancePenComparison {
+    double currentMultiplier;
+    double compareMultiplier;
+    double relativeGainPercent;
+};
+
+ResistancePenComparison calculateResistancePenetrationComparison(
+    double enemyRES,
+    double sumPEN,
+    double comparePEN);
+
+// SECTION 16: breakpoint disclaimer text for UI display.
+const char* getSpeedBreakpointDisclaimer(void);
+
+// SECTION 17: Action Advance (declaration; see header comment above impl).
+// (calculateActionAdvance is already declared near calculateSpeedWithBaseBonus.)
+
+// SECTION 18: Mid-turn speed change AV recalculation.
+double calculateMidTurnSpeedChange(
+    double oldSpeed,
+    double avAlreadySpent,
+    double actionAdvancePercentAlreadyApplied,
+    double newSpeed);
 
 } // namespace damage
 } // namespace hsr

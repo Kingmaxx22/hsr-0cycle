@@ -92,6 +92,7 @@ private:
     bool backRequested = false;
 
     int focusedField = -1; // slotIndex * 4 + substatRow; -1 = no value field focused
+    int focusedMainSlot = -1; // GearSlot index with focused main-stat value; -1 = none
     ActiveDropdown activeDropdown;
 
     static constexpr float kCardW = 350.0f;

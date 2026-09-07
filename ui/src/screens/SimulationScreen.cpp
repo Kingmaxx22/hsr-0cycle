@@ -32,13 +32,13 @@ SimulationScreen::~SimulationScreen() {
 void SimulationScreen::initialize() {
     resetSimulation();
 
-    // Add some default characters for testing
-    // Using the "build from components" workflow (manualStats = false)
-    // Stats are calculated from base + LC + bonuses
+    // Fallback demo character, used only when the team is empty.
+    // Real entries arrive via App's team handoff (Sec 21.7) carrying
+    // calculated combat stats — never re-entered here (Sec 21.8).
     hsr::CharacterConfig testChar;
     testChar.id = "test_dps";
     testChar.name = "Test DPS";
-    testChar.speed = 134;
+    testChar.level = 80;
     testChar.maxSp = 5;
     testChar.currentSp = 3;
     testChar.energy = 50;
@@ -62,6 +62,16 @@ void SimulationScreen::initialize() {
     testChar.lightConeBaseAtk = 80.0;  // LC base ATK
     testChar.lightConeBaseDef = 20.0;  // LC base DEF
     testChar.manualStats = false;      // Use build-from-components workflow
+    // Demo combat stats (Sec 21.2): replaced by loadout values on handoff.
+    testChar.critRate = 0.70;
+    testChar.critDmg = 1.40;
+    testChar.elementalDmgPct = 0.30;
+    testChar.resPen = 0.10;
+    testChar.scalingStat = "atk";
+    testChar.basicMultiplier = 1.0;
+    testChar.skillMultiplier = 2.2;
+    testChar.ultMultiplier = 3.5;
+    testChar.fuaMultiplier = 1.2;
 
     characters.push_back(testChar);
 
@@ -79,6 +89,11 @@ void SimulationScreen::setSelectedEnemy(const std::string& enemyId) {
         currentEnemy.maxHp = static_cast<int>(enemyInfo->hp);
         currentEnemy.currentHp = static_cast<int>(enemyInfo->hp);
         currentEnemy.toughness = static_cast<int>(enemyInfo->toughness);
+        // Section 21.3: enemy combat state comes from the enemy system.
+        currentEnemy.level = enemyInfo->level;
+        currentEnemy.baseDef = enemyInfo->def;
+        currentEnemy.slotIndex = 0;
+        currentEnemy.spawnAv = 0;
 
         // Get physical resistance if available, otherwise default to 0
         auto resIt = enemyInfo->resistances.find("Physical");

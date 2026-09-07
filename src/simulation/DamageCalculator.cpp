@@ -126,12 +126,6 @@ double calculateDefenseMultiplier(
     return calculateDefenseMultiplier(config);
 }
 
-struct DefenseShredComparison {
-    double currentMultiplier;
-    double compareMultiplier;
-    double relativeGainPercent;
-};
-
 DefenseShredComparison calculateDefenseShredComparison(
     double enemyTotalDEF,
     double shredPercent,
@@ -185,27 +179,33 @@ DefenseShredComparison calculateDefenseShredComparison(
 // RES Mult = 1 - Effective RES, clamped to range [0.1, 2.0]
 
 double calculateResistanceMultiplier(const ResistanceMultiplierConfig& config) {
-    // Determine base RES based on resistance type
+    // Exact DB value wins when provided; otherwise fall back to buckets.
     double enemyBaseRES = 0.20; // Default Neutral = 20%
 
-    switch (config.resistanceType) {
-        case EnemyResistanceType::Weak:
-            enemyBaseRES = 0.0;   // Weak = 0%
-            break;
-        case EnemyResistanceType::Resistant:
-            enemyBaseRES = 0.40;  // Resistant = 40%
-            break;
-        case EnemyResistanceType::Neutral:
-        default:
-            enemyBaseRES = 0.20;  // Neutral = 20%
-            break;
+    if (config.explicitBaseRES >= 0.0) {
+        enemyBaseRES = config.explicitBaseRES;
+    } else {
+        switch (config.resistanceType) {
+            case EnemyResistanceType::Weak:
+                enemyBaseRES = 0.0;   // Weak = 0%
+                break;
+            case EnemyResistanceType::Resistant:
+                enemyBaseRES = 0.40;  // Resistant = 40%
+                break;
+            case EnemyResistanceType::Neutral:
+            default:
+                enemyBaseRES = 0.20;  // Neutral = 20%
+                break;
+        }
     }
 
     // Clamp enemy RES between -100% and 90% before applying penetration
     double clampedRES = std::clamp(enemyBaseRES, -1.0, 0.9);
 
-    // Apply RES penetration
-    double effectiveRES = clampedRES - std::clamp(config.resPenetration, 0.0, 1.0);
+    // Apply RES penetration. PEN is NOT capped at 100%: values above 100%
+    // are legal (practical max ~190% vs a 90% RES enemy) and drive
+    // effective RES negative, handled by the [0.1, 2.0] mult clamp below.
+    double effectiveRES = clampedRES - std::max(0.0, config.resPenetration);
 
     // Calculate RES Mult = 1 - Effective RES
     double resMult = 1.0 - effectiveRES;
@@ -244,26 +244,20 @@ double calculateResistanceMultiplier(
     return calculateResistanceMultiplier(config);
 }
 
-struct ResistancePenComparison {
-    double currentMultiplier;
-    double compareMultiplier;
-    double relativeGainPercent;
-};
-
 ResistancePenComparison calculateResistancePenetrationComparison(
     double enemyRES,
     double sumPEN,
     double comparePEN) {
 
-    // Current calculation
+    // Current calculation (PEN uncapped above, see calculateResistanceMultiplier)
     double clampedRES = std::clamp(enemyRES, -1.0, 0.9);
-    double effectiveRES = clampedRES - std::clamp(sumPEN, 0.0, 1.0);
+    double effectiveRES = clampedRES - std::max(0.0, sumPEN);
     double currentMult = 1.0 - effectiveRES;
     currentMult = std::clamp(currentMult, 0.1, 2.0);
 
-    // Compare calculation
+    // Compare calculation (PEN uncapped above, see calculateResistanceMultiplier)
     double compareClampedRES = std::clamp(enemyRES, -1.0, 0.9);
-    double compareEffectiveRES = compareClampedRES - std::clamp(comparePEN, 0.0, 1.0);
+    double compareEffectiveRES = compareClampedRES - std::max(0.0, comparePEN);
     double compareMult = 1.0 - compareEffectiveRES;
     compareMult = std::clamp(compareMult, 0.1, 2.0);
 
@@ -606,6 +600,14 @@ double calculatePunchlineBangerMultiplier(int stackCount, StackType stackType) {
     config.stackType = stackType;
 
     return calculatePunchlineBangerMultiplier(config);
+}
+
+double calculateCritMultiplier(double critRate, double critDmg) {
+    // Expected-value convention: average damage scales by 1 + rate x dmg.
+    // Rate is a chance and clamps to [0, 1]; crit DMG floors at 0.
+    double rate = std::clamp(critRate, 0.0, 1.0);
+    double dmg = std::max(0.0, critDmg);
+    return 1.0 + rate * dmg;
 }
 
 // ============================================================================

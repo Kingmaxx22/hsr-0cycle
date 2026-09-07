@@ -37,7 +37,7 @@ bool App::initialize()
 
     charactersScreen =
         std::make_unique<CharactersScreen>(
-            assets, characters, relicSets, lightCones);
+            assets, characters, relicSets, lightCones, loadouts);
     charactersScreen->initialize();
 
     relicRoster = std::make_unique<RelicRosterScreen>(assets, characters);
@@ -86,12 +86,81 @@ void App::goToEnemiesScreen()
     activeNav = 4;
 }
 
+// Section 21.7 + 22.3/22.4: single handoff path from team/loadout data
+// into engine configs. Calculated values travel with the config — the
+// simulation screen never asks for them again (Sec 21.8). The two input
+// modes are mutually exclusive per character (Sec 22.5): a completed
+// manual entry wins for its character, otherwise components resolve.
+static hsr::CharacterConfig BuildSimCharacter(
+    const CharacterInfo& info,
+    CharacterLoadout& loadout,
+    const LightConeDatabase& lightCones,
+    const CharactersScreen* charactersScreen)
+{
+    hsr::CharacterConfig config;
+
+    if (charactersScreen != nullptr && charactersScreen->isManualStatsMode())
+    {
+        CharactersScreen::ManualConfig manual = charactersScreen->getManualConfig();
+        if (manual.characterId == info.id &&
+            (manual.hp + manual.atk + manual.def + manual.spd) > 0)
+        {
+            loadout::applyManualToCharacterConfig(
+                config, info.id, info.name,
+                static_cast<double>(manual.hp), static_cast<double>(manual.atk),
+                static_cast<double>(manual.def), static_cast<double>(manual.spd),
+                manual.critRate, manual.critDmg, manual.elemDmg,
+                manual.resPen, manual.ehr, manual.effectRes);
+            config.level = loadout.level;
+            config.rotation = {"Skill", "Basic", "Basic"};
+            // Skill multipliers below are documented fallbacks, not data.
+            config.scalingStat = "atk";
+            config.basicMultiplier = 1.0;
+            config.skillMultiplier = 2.0;
+            config.ultMultiplier = 3.0;
+            config.fuaMultiplier = 1.0;
+            return config;
+        }
+    }
+
+    ensureLoadoutDefaults(loadout);
+    loadout::applyToCharacterConfig(config, info, loadout, lightCones);
+    config.rotation = {"Skill", "Basic", "Basic"};
+    // Skill multipliers below are documented fallbacks, not data.
+    config.scalingStat = "atk";
+    config.basicMultiplier = 1.0;
+    config.skillMultiplier = 2.0;
+    config.ultMultiplier = 3.0;
+    config.fuaMultiplier = 1.0;
+    return config;
+}
+
 void App::goToSimulationScreen(int navIndex)
 {
     // Pass selected enemy from EnemiesScreen if available
     std::string selectedEnemy = enemiesScreen->getSelectedEnemyId();
     if (!selectedEnemy.empty()) {
         simulationScreen->setSelectedEnemy(selectedEnemy);
+    }
+    // Section 21.7: push the configured team straight into the engine.
+    bool hasTeam = false;
+    for (const auto& id : teamBuilder->getTeam()) {
+        if (!id.empty()) {
+            hasTeam = true;
+            break;
+        }
+    }
+    if (hasTeam) {
+        simulationScreen->clearCharacters();
+        for (const auto& id : teamBuilder->getTeam()) {
+            if (id.empty())
+                continue;
+            const CharacterInfo* info = characters.get(id);
+            if (info != nullptr)
+                simulationScreen->addCharacter(
+                    BuildSimCharacter(*info, loadouts[id], lightCones,
+                                      charactersScreen.get()));
+        }
     }
     activeView = ActiveView::Simulation;
     // Preserve the clicked sidebar highlight (ROTATION=5, SIMULATE=6).
@@ -100,6 +169,7 @@ void App::goToSimulationScreen(int navIndex)
 
 void App::goToCharactersScreen()
 {
+    charactersScreen->setTeamContext(teamBuilder->getTeam());
     activeView = ActiveView::Characters;
     activeNav = 1;
 }
@@ -124,7 +194,13 @@ void App::run()
         BeginDrawing();
         ClearBackground(Color{18, 20, 27, 255});
 
-        const int navClick = sidebar.updateAndDraw(activeNav);
+        // Simulation runs as a dedicated full-window view (its own
+        // window; Raylib hosts a single OS window). The sidebar is
+        // hidden so sim panels own the full 1440x900 area; ESC returns.
+        const bool simFullscreen = (activeView == ActiveView::Simulation);
+        int navClick = -1;
+        if (!simFullscreen)
+            navClick = sidebar.updateAndDraw(activeNav);
 
         if (navClick == 0)
         {

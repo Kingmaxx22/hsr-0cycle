@@ -9,6 +9,7 @@
 #include "widgets/Sidebar.h"
 #include "screens/TeamBuilderScreen.h"
 #include "screens/CharactersScreen.h"
+#include "data/LoadoutResolver.h"
 #include "screens/Relicrosterscreen.h"
 #include "screens/Reliceditorscreen.h"
 #include "screens/LightConeScreen.h"

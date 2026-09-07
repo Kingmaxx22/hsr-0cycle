@@ -1,6 +1,7 @@
 #include "SimulationEngine.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace hsr {
 
@@ -9,10 +10,10 @@ SimulationEngine::SimulationEngine() {}
 SimulationEngine::~SimulationEngine() {}
 
 int SimulationEngine::calculateActionCost(int speed, const std::string& actionType) {
+    int safeSpeed = std::max(1, speed);
     // Base AV = 10000 / speed (using integer math with 2 decimal precision)
-    int baseAv = 10000 / speed;
-    
-    // Action modifiers (these are simplified - real HSR has more complex formulas)
+    int baseAv = 10000 / safeSpeed;
+
     if (actionType == "Basic") {
         return baseAv;
     } else if (actionType == "Skill") {
@@ -22,7 +23,7 @@ int SimulationEngine::calculateActionCost(int speed, const std::string& actionTy
     } else if (actionType == "FUA") {
         return 0; // Follow-up attack is instant
     }
-    
+
     return baseAv;
 }
 
@@ -50,28 +51,111 @@ double SimulationEngine::calculateTotalSpeed(const CharacterConfig& config) {
     return config.baseSpd * (1.0 + config.spdPct) + config.flatSpd;
 }
 
+int SimulationEngine::effectiveSpeed(const CharacterConfig& config) {
+    // Section 21.8: manual entry and component builds are mutually exclusive
+    // sources — never mixed for the same character.
+    if (config.manualStats)
+        return std::max(1, config.speed);
+    return std::max(1, static_cast<int>(std::lround(calculateTotalSpeed(config))));
+}
+
+double SimulationEngine::effectiveStat(const CharacterConfig& config, const std::string& stat) {
+    if (config.manualStats) {
+        if (stat == "hp") return config.finalHp;
+        if (stat == "def") return config.finalDef;
+        return config.finalAtk;
+    }
+    if (stat == "hp") return calculateTotalHp(config);
+    if (stat == "def") return calculateTotalDef(config);
+    return calculateTotalAtk(config);
+}
+
+int SimulationEngine::calculateHitDamage(const CharState& charState,
+                                         const EnemyState& enemyState,
+                                         const std::string& actionType,
+                                         ActionEvent& outEvent) {
+    const CharacterConfig& c = charState.config;
+
+    // Section 2: skill multiplier + scaling attribute from the single
+    // source of truth (entered finals or component-built totals).
+    double skillMult = c.basicMultiplier;
+    if (actionType == "Skill") skillMult = c.skillMultiplier;
+    else if (actionType == "Ult") skillMult = c.ultMultiplier;
+    else if (actionType == "FUA") skillMult = c.fuaMultiplier;
+
+    double scalingValue = effectiveStat(c, c.scalingStat);
+    if (c.scalingStat == "atk")
+        scalingValue *= (1.0 + c.buffAtkPct);
+
+    damage::MasterDamageConfig dmg;
+    dmg.baseDamageConfig.skillMultiplier = skillMult;
+    dmg.baseDamageConfig.scalingAttributeValue = scalingValue;
+    // Section 3 (+ starting buff DMG%).
+    dmg.dmgPercentMultiplier = 1.0 + c.elementalDmgPct + c.allTypeDmgPct + c.buffDmgPct;
+    // Section 4 + Section 12 shred.
+    dmg.defenseConfig.attackerLevel = std::max(1, c.level);
+    dmg.defenseConfig.enemyBaseDEF = enemyState.config.baseDef;
+    dmg.defenseConfig.defIgnorePercent = c.defIgnorePct;
+    dmg.defenseConfig.shredPercent = enemyState.config.defShredTaken;
+    dmg.defenseConfig.isPlightDifficulty = enemyState.config.isPlightDifficulty;
+    // Section 5: attacker PEN stacks with enemy RES reduction (Sec 21.3).
+    dmg.resistanceConfig.resistanceType = enemyState.config.resistanceType;
+    dmg.resistanceConfig.explicitBaseRES = enemyState.config.baseResOverride;
+    dmg.resistanceConfig.resPenetration = c.resPen + enemyState.config.resReduction;
+    // Section 6.
+    dmg.damageTakenConfig.elementalDMGTaken = enemyState.config.dmgTakenElemental;
+    dmg.damageTakenConfig.allTypeDMGTaken = enemyState.config.dmgTakenAll;
+    // Section 7: broken state comes from live toughness tracking.
+    dmg.universalReductionConfig.isEnemyBroken = enemyState.broken;
+    // Section 8 defaults to 1.0 (player outgoing damage).
+    // Section 11: standard pool (+ special pool for the 2 special enemies).
+    dmg.vulnerabilityConfig.sumVULN = enemyState.config.vulnSum;
+    if (enemyState.config.specialVuln > 0.0) {
+        dmg.vulnerabilityConfig.vulnType = damage::EnemyVulnerabilityType::Special;
+        dmg.vulnerabilityConfig.specialVulnEnemy = enemyState.config.specialVuln;
+    }
+
+    damage::DamageResult result = damage::calculateOutgoingDamage(dmg);
+    // Section 21.4: expected-value crit, applied outside the Sec 1 formula.
+    double critMult = damage::calculateCritMultiplier(c.critRate, c.critDmg);
+    // Section 14: exactly one pool is ever active (stackPool selects it).
+    double stackMult = 1.0;
+    if (c.stackPool == 1)
+        stackMult = damage::calculatePunchlineBangerMultiplier(c.stackCount, damage::StackType::Punchline);
+    else if (c.stackPool == 2)
+        stackMult = damage::calculatePunchlineBangerMultiplier(c.stackCount, damage::StackType::Banger);
+
+    outEvent.damageBreakdown = result;
+    outEvent.critMultiplier = critMult;
+    outEvent.stackMultiplier = stackMult;
+
+    double finalDamage = result.finalDamage * critMult * stackMult;
+    return std::max(0, static_cast<int>(std::lround(finalDamage)));
+}
+
 void SimulationEngine::applyActionEffects(
-    CharState& charState, 
-    EnemyState& enemyState, 
+    CharState& charState,
+    std::vector<EnemyState>& enemies,
+    EnemyState& target,
     const std::string& actionType,
+    int currentGlobalAv,
     std::vector<ActionEvent>& timeline) {
-    
+
+    (void)enemies;
+
     ActionEvent event;
     event.characterId = charState.config.id;
     event.characterName = charState.config.name;
     event.actionType = actionType;
-    event.avCost = calculateActionCost(charState.config.speed, actionType);
+    event.targetEnemyId = target.config.id;
+    event.currentAv = currentGlobalAv;
+    event.avCost = calculateActionCost(effectiveSpeed(charState.config), actionType);
     event.isExtraTurn = false;
-    
-    // Simplified damage calculation (placeholder - would need full damage formula)
-    int baseDamage = 1000;
-    if (actionType == "Skill") baseDamage = 2500;
-    else if (actionType == "Ult") baseDamage = 4000;
-    else if (actionType == "FUA") baseDamage = 1500;
-    
-    event.damageDealt = static_cast<int>(baseDamage * (1.0f - enemyState.config.resistance));
     event.breakDamage = 0.0f;
-    
+
+    // Section 1 master formula via the implemented Sections 2-8/11 stages.
+    event.damageDealt = calculateHitDamage(charState, target, actionType, event);
+
     // SP changes
     if (actionType == "Basic") {
         event.spChange = 1;
@@ -82,58 +166,86 @@ void SimulationEngine::applyActionEffects(
     } else {
         event.spChange = 0;
     }
-    
-    // Energy gain (simplified)
+
+    // Energy gain (Ult already had the energy to fire)
     float energyGain = 20.0f;
-    if (actionType == "Ult") energyGain = 0; // Already have energy to ult
+    if (actionType == "Ult") energyGain = 0.0f;
     charState.energy = std::min(charState.energy + energyGain, charState.config.maxEnergy);
-    
-    // Apply damage to enemy
-    enemyState.currentHp = std::max(0, enemyState.currentHp - event.damageDealt);
-    
-    // Check for toughness break (simplified)
-    if (event.damageDealt > 0) {
-        enemyState.currentToughness = std::max(0, enemyState.currentToughness - 30);
-        if (enemyState.currentToughness == 0) {
-            event.breakDamage = 1000.0f; // Break damage bonus
-            enemyState.currentToughness = enemyState.config.toughness; // Reset after break
+
+    // Apply damage to the target enemy
+    target.currentHp = std::max(0, target.currentHp - event.damageDealt);
+
+    // Toughness damage tiers are fallback defaults until per-skill toughness
+    // values arrive with the Section 22 character-data work.
+    int toughnessDamage = 20;
+    if (actionType == "Basic") toughnessDamage = 10;
+    else if (actionType == "Skill") toughnessDamage = 20;
+    else if (actionType == "Ult") toughnessDamage = 30;
+    else if (actionType == "FUA") toughnessDamage = 10;
+
+    if (event.damageDealt > 0 && !target.broken) {
+        target.currentToughness = std::max(0, target.currentToughness - toughnessDamage);
+        if (target.currentToughness == 0) {
+            // Broken: the modeled effect is the Section 7 built-in 10%
+            // reduction switching off. Bonus break-event damage uses the
+            // level/break-effect formula (no section yet) — recorded as 0
+            // rather than a placeholder constant.
+            target.broken = true;
+            event.breakDamage = 0.0f;
         }
     }
-    
+    if (target.currentHp <= 0)
+        target.active = false;
+
     timeline.push_back(event);
 }
 
-bool SimulationEngine::checkZeroCycleClear(const EnemyState& enemy, int currentAv) {
-    return enemy.currentHp <= 0 && currentAv <= 15000;
+bool SimulationEngine::allEnemiesDefeated(const std::vector<EnemyState>& enemies, int avLimit) {
+    for (const auto& e : enemies) {
+        if (e.active && e.currentHp > 0)
+            return false;
+        // A pending spawn inside the AV limit means combat is not over.
+        if (!e.active && e.currentHp > 0 && e.config.spawnAv > 0 && e.config.spawnAv <= avLimit)
+            return false;
+    }
+    return true;
+}
+
+bool SimulationEngine::checkZeroCycleClear(const std::vector<EnemyState>& enemies, int currentAv) {
+    // Single-wave convenience predicate: everything currently known is
+    // resolved and the kill happened at or under 150.00 AV. NOTE: the main
+    // loop does NOT use this — it checks allEnemiesDefeated(enemies,
+    // avLimit) so pending in-limit spawns correctly block a clear.
+    return allEnemiesDefeated(enemies, currentAv) && currentAv <= 15000;
 }
 
 std::vector<SimulationEngine::SpeedBreakpoint> SimulationEngine::calculateBreakpoints(
     int baseSpeed, int avLimit) {
-    
-    std::vector<SpeedBreakpoint> breakpoints;
-    
+
+    std::vector<SimulationEngine::SpeedBreakpoint> breakpoints;
+
     // Calculate how many actions needed for different targets
     for (int targetActions = 1; targetActions <= 5; ++targetActions) {
         SpeedBreakpoint bp;
         bp.targetActions = targetActions;
-        
+
         // Speed needed = (10000 * targetActions) / avLimit
         // For 150 AV limit: Speed = (10000 * actions) / 15000
         bp.requiredSpeed = (10000 * targetActions + avLimit - 1) / avLimit; // Ceiling division
-        
+
         bp.description = std::to_string(targetActions) + " actions in 150 AV";
-        
+
         breakpoints.push_back(bp);
     }
-    
+
     return breakpoints;
 }
 
 SimulationResult SimulationEngine::runSimulation(
     const std::vector<CharacterConfig>& characters,
-    const EnemyConfig& enemy,
+    const EncounterConfig& encounter,
     int avLimit) {
-    
+
     SimulationResult result;
     result.success = false;
     result.totalCycles = 0;
@@ -141,52 +253,132 @@ SimulationResult SimulationEngine::runSimulation(
     result.totalDamage = 0.0f;
     result.totalBreakDamage = 0.0f;
     result.isZeroCycleClear = false;
-    
+
     if (characters.empty()) {
         result.errorMessage = "No characters provided";
         return result;
     }
-    
-    // Initialize states
+
+    // Initialize persistent combat state (Sec 21.6).
     std::vector<CharState> charStates;
     for (const auto& config : characters) {
         CharState state;
         state.config = config;
-        state.currentAv = 0;
         state.actionIndex = 0;
         state.sp = config.currentSp;
         state.energy = config.energy;
+        state.turnStartSpeed = effectiveSpeed(config);
+        state.scheduleBaseAv = 0;
+        // First-turn threshold from effective speed (Sec 15/16).
+        state.currentAv = 10000 / state.turnStartSpeed;
         charStates.push_back(state);
     }
-    
-    EnemyState enemyState;
-    enemyState.config = enemy;
-    enemyState.currentHp = enemy.currentHp;
-    enemyState.currentToughness = enemy.toughness;
-    
+
+    std::vector<EnemyState> enemyStates;
+    for (const auto& e : encounter.flatten()) {
+        EnemyState state;
+        state.config = e;
+        state.currentHp = e.currentHp;
+        state.currentToughness = e.toughness;
+        state.active = (e.spawnAv <= 0);
+        state.broken = false;
+        enemyStates.push_back(state);
+    }
+
+    if (enemyStates.empty()) {
+        result.errorMessage = "No enemies in encounter";
+        return result;
+    }
+
     int currentGlobalAv = 0;
-    
-    // Main simulation loop - process actions in AV order
-    while (currentGlobalAv <= avLimit && enemyState.currentHp > 0) {
+
+    // Main simulation loop - process actions in AV order.
+    while (currentGlobalAv <= avLimit) {
+        // Activate scheduled spawns (Sec 21.3: dynamic mid-combat entry).
+        for (auto& e : enemyStates) {
+            if (!e.active && e.currentHp > 0 && e.config.spawnAv > 0 &&
+                e.config.spawnAv <= currentGlobalAv) {
+                e.active = true;
+                ActionEvent spawnEvent;
+                spawnEvent.actionType = "Spawn";
+                spawnEvent.characterName = e.config.name;
+                spawnEvent.targetEnemyId = e.config.id;
+                spawnEvent.currentAv = currentGlobalAv;
+                result.timeline.push_back(spawnEvent);
+            }
+        }
+
+        if (allEnemiesDefeated(enemyStates, avLimit))
+            break;
+
+        // Find next pending spawn to fast-forward to when nothing is active.
+        bool anyTarget = false;
+        for (const auto& e : enemyStates) {
+            if (e.active && e.currentHp > 0) {
+                anyTarget = true;
+                break;
+            }
+        }
+        if (!anyTarget) {
+            int nextSpawn = INT32_MAX;
+            for (const auto& e : enemyStates) {
+                if (!e.active && e.currentHp > 0 && e.config.spawnAv > currentGlobalAv)
+                    nextSpawn = std::min(nextSpawn, e.config.spawnAv);
+            }
+            if (nextSpawn == INT32_MAX || nextSpawn > avLimit)
+                break;
+            currentGlobalAv = nextSpawn;
+            for (auto& cs : charStates)
+                cs.currentAv = std::max(cs.currentAv, nextSpawn);
+            continue;
+        }
+
         // Find character with lowest currentAv (next to act)
         int actingCharIdx = -1;
         int minAv = INT32_MAX;
-        
+
         for (size_t i = 0; i < charStates.size(); ++i) {
             if (charStates[i].currentAv < minAv) {
                 minAv = charStates[i].currentAv;
                 actingCharIdx = static_cast<int>(i);
             }
         }
-        
+
         if (actingCharIdx == -1) break;
-        
+
         CharState& actingChar = charStates[actingCharIdx];
         currentGlobalAv = actingChar.currentAv;
-        
+        if (currentGlobalAv > avLimit) break;
+
+        // Section 18: rescale the pending threshold if effective speed
+        // changed since this turn was scheduled (no-op for static buffs).
+        int effSpeed = effectiveSpeed(actingChar.config);
+        if (effSpeed != actingChar.turnStartSpeed && actingChar.turnStartSpeed > 0) {
+            double spent = static_cast<double>(currentGlobalAv - actingChar.scheduleBaseAv);
+            double total = damage::calculateMidTurnSpeedChange(
+                static_cast<double>(actingChar.turnStartSpeed), spent, 0.0,
+                static_cast<double>(effSpeed));
+            double remaining = total - spent;
+            if (remaining < 0.0) remaining = 0.0;
+            actingChar.currentAv = currentGlobalAv + static_cast<int>(std::lround(remaining));
+            actingChar.turnStartSpeed = effSpeed;
+            currentGlobalAv = actingChar.currentAv;
+            if (currentGlobalAv > avLimit) break;
+        }
+
+        // Target: first active, living enemy in slot order (Sec 22.9).
+        EnemyState* target = nullptr;
+        for (auto& e : enemyStates) {
+            if (e.active && e.currentHp > 0) {
+                target = &e;
+                break;
+            }
+        }
+        if (target == nullptr) continue;
+
         // Determine action to take
         std::string actionToTake;
-        
+
         if (actingChar.config.isAuto) {
             // Simple AI: Use skill if SP >= 1 and we have it in rotation, else basic
             bool hasSkillInRotation = false;
@@ -196,7 +388,7 @@ SimulationResult SimulationEngine::runSimulation(
                     break;
                 }
             }
-            
+
             if (hasSkillInRotation && actingChar.sp >= 1 && actingChar.energy >= actingChar.config.maxEnergy * 0.5f) {
                 actionToTake = "Skill";
             } else {
@@ -217,34 +409,60 @@ SimulationResult SimulationEngine::runSimulation(
                 }
             }
         }
-        
+
         // Check if we can actually perform the action (SP check for skill)
         if (actionToTake == "Skill" && actingChar.sp < 1) {
             actionToTake = "Basic"; // Fallback to basic if no SP
         }
-        
+
         // Apply action effects
-        applyActionEffects(actingChar, enemyState, actionToTake, result.timeline);
-        
-        // Update totals
+        applyActionEffects(actingChar, enemyStates, *target, actionToTake, currentGlobalAv, result.timeline);
+
+        // Update totals (damage actions only — Spawn events carry no damage)
         result.totalActions++;
         result.totalDamage += result.timeline.back().damageDealt;
         result.totalBreakDamage += result.timeline.back().breakDamage;
-        
-        // Advance character's AV for next turn
-        int actionCost = calculateActionCost(actingChar.config.speed, actionToTake);
+
+        // Schedule the next turn: base cost, then Section 17 advance.
+        int actionCost = calculateActionCost(effSpeed, actionToTake);
         actingChar.currentAv += actionCost;
-        
-        // Check for zero cycle clear
-        if (checkZeroCycleClear(enemyState, currentGlobalAv)) {
+        if (actionToTake == "Ult" && actingChar.config.ultAdvancePct > 0.0) {
+            int nextCost = 10000 / effSpeed;
+            double newRemainingPct = damage::calculateActionAdvance(
+                100.0, actingChar.config.ultAdvancePct, actingChar.delayedRequirementPct);
+            actingChar.currentAv += static_cast<int>(
+                std::lround(nextCost * newRemainingPct / 100.0));
+        }
+        actingChar.turnStartSpeed = effSpeed;
+        actingChar.scheduleBaseAv = currentGlobalAv;
+
+        // Section 18 (all combatants): rescale anyone whose effective
+        // speed changed as a result of this action.
+        for (auto& cs : charStates) {
+            int csEff = effectiveSpeed(cs.config);
+            if (csEff != cs.turnStartSpeed && cs.turnStartSpeed > 0) {
+                double spent = static_cast<double>(currentGlobalAv - cs.scheduleBaseAv);
+                double total = damage::calculateMidTurnSpeedChange(
+                    static_cast<double>(cs.turnStartSpeed), spent, 0.0,
+                    static_cast<double>(csEff));
+                double remaining = total - spent;
+                if (remaining < 0.0) remaining = 0.0;
+                cs.currentAv = currentGlobalAv + static_cast<int>(std::lround(remaining));
+                cs.turnStartSpeed = csEff;
+            }
+        }
+
+        // Check for zero cycle clear. Pending spawns inside the AV limit
+        // must block the clear — hence avLimit, not currentGlobalAv.
+        if (allEnemiesDefeated(enemyStates, avLimit) && currentGlobalAv <= 15000) {
             result.isZeroCycleClear = true;
             result.totalCycles = 0;
             break;
         }
     }
-    
+
     // Determine final result
-    if (enemyState.currentHp <= 0) {
+    if (allEnemiesDefeated(enemyStates, avLimit)) {
         result.success = true;
         if (result.isZeroCycleClear) {
             result.totalCycles = 0;
@@ -257,24 +475,34 @@ SimulationResult SimulationEngine::runSimulation(
         result.errorMessage = "Enemy not defeated within AV limit";
         result.totalCycles = (currentGlobalAv + 14999) / 15000;
     }
-    
-    // Store final stats
+
+    // Store final stats (single source of truth: effective values)
     for (const auto& state : charStates) {
         result.finalStats[state.config.id + "_sp"] = state.sp;
         result.finalStats[state.config.id + "_energy"] = static_cast<int>(state.energy);
-        
-        // Store calculated combat stats (from component build workflow)
-        result.finalStats[state.config.id + "_hp"] = static_cast<int>(
-            calculateTotalHp(state.config));
-        result.finalStats[state.config.id + "_atk"] = static_cast<int>(
-            calculateTotalAtk(state.config));
-        result.finalStats[state.config.id + "_def"] = static_cast<int>(
-            calculateTotalDef(state.config));
-        result.finalStats[state.config.id + "_spd"] = static_cast<int>(
-            calculateTotalSpeed(state.config));
+        result.finalStats[state.config.id + "_hp"] =
+            static_cast<int>(std::lround(effectiveStat(state.config, "hp")));
+        result.finalStats[state.config.id + "_atk"] =
+            static_cast<int>(std::lround(effectiveStat(state.config, "atk")));
+        result.finalStats[state.config.id + "_def"] =
+            static_cast<int>(std::lround(effectiveStat(state.config, "def")));
+        result.finalStats[state.config.id + "_spd"] = effectiveSpeed(state.config);
     }
-    
+    for (const auto& e : enemyStates) {
+        result.finalStats["enemy_" + e.config.id + "_hp"] = e.currentHp;
+    }
+
     return result;
+}
+
+SimulationResult SimulationEngine::runSimulation(
+    const std::vector<CharacterConfig>& characters,
+    const EnemyConfig& enemy,
+    int avLimit) {
+
+    EncounterConfig encounter;
+    encounter.slots[0].push_back(enemy);
+    return runSimulation(characters, encounter, avLimit);
 }
 
 } // namespace hsr

@@ -3,6 +3,7 @@
 #include "Gearrules.h"
 
 #include <array>
+#include <cmath>
 #include <string>
 #include <unordered_map>
 
@@ -18,7 +19,38 @@ struct SubstatRoll
 struct GearPiece
 {
     std::string mainStat;
+    // Editable main-stat value (same entry convention as substat valueText:
+    // percent-number for % stats, raw number for flat stats). Defaults to
+    // the 5-star max; the player can overwrite it (Sec 22.8).
+    std::string mainStatValueText;
     std::array<SubstatRoll, 4> substats;
+};
+
+// "Other stat bonuses" (Sec 22.2): anything not covered by base stats, Light
+// Cone, or gear — e.g. team buffs, technique bonuses, manual corrections.
+// Percent fields are stored as decimals (0.15 = 15%); flatSpd is raw Speed.
+struct OtherStatBonuses
+{
+    double hpPct = 0.0;
+    double atkPct = 0.0;
+    double defPct = 0.0;
+    double flatSpd = 0.0;
+    double critRate = 0.0;
+    double critDmg = 0.0;
+    double elemDmgPct = 0.0;
+    double resPen = 0.0;
+    double ehr = 0.0;
+};
+
+// Manual base-stat override (Sec 22.1/22.8): lets a player without complete
+// character data type base values directly. Ignored unless useOverride.
+struct ManualBaseStats
+{
+    bool useOverride = false;
+    double hp = 0.0;
+    double atk = 0.0;
+    double def = 0.0;
+    double spd = 0.0;
 };
 
 struct CharacterLoadout
@@ -37,13 +69,36 @@ struct CharacterLoadout
     std::string relicSetB;   // second 2pc set; unused when relicFourPiece
     std::string planarSet;   // Planar Sphere + Link Rope set (always 2pc)
 
+    // Section 22 component inputs beyond gear.
+    OtherStatBonuses otherBonuses;
+    ManualBaseStats manualBase;
+    int level = 80;          // Character level (attacker level, Sec 4)
+
     bool initialized = false;
 };
 
 using LoadoutStore = std::unordered_map<std::string, CharacterLoadout>;
 
-// Fills in sane defaults (first valid main stat per slot) the first time a
-// character's loadout is touched. Safe to call repeatedly.
+// Formats a stat value for the editable text buffers: percent-numbers
+// without the "%" sign ("43.2"), flat values raw ("705").
+inline std::string formatStatValueText(double value, const std::string& key)
+{
+    if (isPercentStatKey(key))
+    {
+        // Trim float noise: round to 2 decimals, drop trailing zeros.
+        double rounded = std::round(value * 100.0) / 100.0;
+        std::string text = std::to_string(rounded);
+        text.erase(text.find_last_not_of('0') + 1, std::string::npos);
+        if (!text.empty() && text.back() == '.')
+            text.pop_back();
+        return text;
+    }
+    long long whole = static_cast<long long>(std::llround(value));
+    return std::to_string(whole);
+}
+
+// Fills in sane defaults (first valid main stat per slot, 5-star max value)
+// the first time a character's loadout is touched. Safe to call repeatedly.
 inline void ensureLoadoutDefaults(CharacterLoadout& loadout)
 {
     if (loadout.initialized)
@@ -54,10 +109,23 @@ inline void ensureLoadoutDefaults(CharacterLoadout& loadout)
         GearSlot slot = static_cast<GearSlot>(i);
         const auto& options = mainStatOptions(slot);
         if (!options.empty())
+        {
             loadout.gear[i].mainStat = options.front().key;
+            loadout.gear[i].mainStatValueText =
+                formatStatValueText(mainStatMaxValue(options.front().key),
+                                    options.front().key);
+        }
     }
 
     loadout.initialized = true;
+}
+
+// Resets a piece's main-stat value to the 5-star max after the player picks
+// a new main stat. The value stays freely editable afterwards.
+inline void resetMainStatValueDefault(GearPiece& piece)
+{
+    piece.mainStatValueText =
+        formatStatValueText(mainStatMaxValue(piece.mainStat), piece.mainStat);
 }
 
 // Picks the next legal substat for a row: skips the piece's current main

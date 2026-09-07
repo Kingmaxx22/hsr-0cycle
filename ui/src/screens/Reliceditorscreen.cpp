@@ -343,6 +343,8 @@ bool RelicEditorScreen::handleDropdownInput(Vector2 mouse, bool pressed)
             {
                 GearPiece& piece = loadout.gear[static_cast<size_t>(activeDropdown.slot)];
                 piece.mainStat = picked.key;
+                // New main stat starts at its 5-star max; stays editable.
+                resetMainStatValueDefault(piece);
 
                 for (auto& sub : piece.substats)
                 {
@@ -485,13 +487,23 @@ void RelicEditorScreen::update(float dt)
         Rectangle card = gearCardBounds(slot);
 
         const auto& mainOptions = mainStatOptions(slot);
-        Rectangle mainRect{card.x + 14.0f, card.y + 34.0f,
-                           card.width - 28.0f, 28.0f};
+        Rectangle mainTypeRect{card.x + 14.0f, card.y + 34.0f, 190.0f, 28.0f};
+        Rectangle mainValueRect{card.x + 212.0f, card.y + 34.0f, 124.0f, 28.0f};
+
+        // Main-stat value box first: it sits beside the dropdown trigger.
+        if (CheckCollisionPointRec(mouse, mainValueRect))
+        {
+            activeDropdown.open = false;
+            activeDropdown.mode = ActiveDropdown::Mode::None;
+            focusedField = -1;
+            focusedMainSlot = i;
+            return;
+        }
 
         if (mainOptions.size() > 1 &&
-            CheckCollisionPointRec(mouse, mainRect))
+            CheckCollisionPointRec(mouse, mainTypeRect))
         {
-            openMainStatDropdown(slot, mainRect);
+            openMainStatDropdown(slot, mainTypeRect);
             return;
         }
 
@@ -515,9 +527,34 @@ void RelicEditorScreen::update(float dt)
                 activeDropdown.open = false;
                 activeDropdown.mode = ActiveDropdown::Mode::None;
                 focusedField = i * 4 + row;
+                focusedMainSlot = -1;
                 return;
             }
         }
+    }
+
+    if (focusedMainSlot >= 0)
+    {
+        std::string& text = loadout.gear[static_cast<size_t>(focusedMainSlot)].mainStatValueText;
+
+        int key = GetCharPressed();
+        while (key > 0)
+        {
+            bool isDigit = key >= '0' && key <= '9';
+            bool isDot = key == '.' && text.find('.') == std::string::npos;
+
+            // Same convention as substats: digits + one dot, no "%" stored.
+            if ((isDigit || isDot) && text.size() < 8)
+                text += static_cast<char>(key);
+
+            key = GetCharPressed();
+        }
+
+        if (IsKeyPressed(KEY_BACKSPACE) && !text.empty())
+            text.pop_back();
+
+        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE))
+            focusedMainSlot = -1;
     }
 
     if (focusedField >= 0)
@@ -799,27 +836,45 @@ void RelicEditorScreen::drawGearCard(GearSlot slot)
              static_cast<int>(card.y + 10.0f), 16, RAYWHITE);
 
     const auto& mainOptions = mainStatOptions(slot);
-    Rectangle mainRect{card.x + 14.0f, card.y + 34.0f,
-                       card.width - 28.0f, 28.0f};
+    Rectangle mainTypeRect{card.x + 14.0f, card.y + 34.0f, 190.0f, 28.0f};
+    Rectangle mainValueRect{card.x + 212.0f, card.y + 34.0f, 124.0f, 28.0f};
     bool mainClickable = mainOptions.size() > 1;
     bool mainOpen = activeDropdown.open &&
                     activeDropdown.mode == ActiveDropdown::Mode::MainStat &&
                     activeDropdown.slot == slot;
 
-    DrawRectangleRounded(mainRect, 0.2f, 8,
+    DrawRectangleRounded(mainTypeRect, 0.2f, 8,
                          mainClickable ? kPanelBg : kDisabledBg);
     if (mainClickable)
-        DrawRectangleRoundedLines(mainRect, 0.2f, 8,
+        DrawRectangleRoundedLines(mainTypeRect, 0.2f, 8,
                                   mainOpen ? kAccentBorder : kPanelBorder);
 
     std::string mainLabel = "MAIN: " + statLabel(mainOptions, piece.mainStat);
-    DrawText(mainLabel.c_str(), static_cast<int>(mainRect.x + 10.0f),
-             static_cast<int>(mainRect.y + 6.0f), 14,
+    DrawText(mainLabel.c_str(), static_cast<int>(mainTypeRect.x + 10.0f),
+             static_cast<int>(mainTypeRect.y + 6.0f), 14,
              mainClickable ? RAYWHITE : kDimText);
 
     if (mainClickable)
-        DrawText("v", static_cast<int>(mainRect.x + mainRect.width - 18.0f),
-                 static_cast<int>(mainRect.y + 6.0f), 14, kDimText);
+        DrawText("v", static_cast<int>(mainTypeRect.x + mainTypeRect.width - 18.0f),
+                 static_cast<int>(mainTypeRect.y + 6.0f), 14, kDimText);
+
+    // Editable main-stat value (Sec 22.2): the exact number on the relic.
+    bool mainFocused = (focusedMainSlot == static_cast<int>(slot));
+    DrawRectangleRounded(mainValueRect, 0.2f, 8, kPanelBg);
+    DrawRectangleRoundedLines(mainValueRect, 0.2f, 8,
+                              mainFocused ? kAccentBorder : kPanelBorder);
+    {
+        std::string valueLabel = piece.mainStatValueText;
+        if (!valueLabel.empty() && isPercentStat(piece.mainStat))
+            valueLabel += "%";
+        if (mainFocused)
+            valueLabel += "_";
+        if (valueLabel.empty())
+            valueLabel = "-";
+        DrawText(valueLabel.c_str(), static_cast<int>(mainValueRect.x + 10.0f),
+                 static_cast<int>(mainValueRect.y + 6.0f), 14,
+                 piece.mainStatValueText.empty() && !mainFocused ? kDimText : RAYWHITE);
+    }
 
     for (int row = 0; row < 4; ++row)
     {

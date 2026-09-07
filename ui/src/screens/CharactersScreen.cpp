@@ -18,9 +18,16 @@ namespace
 } // anonymous namespace
 
 CharactersScreen::CharactersScreen(AssetManager& assets, CharacterDatabase& characters,
-                                    RelicSetDatabase& relicSets, LightConeDatabase& lightCones)
-    : m_assets(assets), m_characters(characters), m_relicSets(relicSets), m_lightCones(lightCones)
+                                     RelicSetDatabase& relicSets, LightConeDatabase& lightCones,
+                                     LoadoutStore& loadouts)
+    : m_assets(assets), m_characters(characters), m_relicSets(relicSets),
+      m_lightCones(lightCones), m_loadouts(loadouts)
 {
+}
+
+void CharactersScreen::setTeamContext(const std::array<std::string, 4>& team)
+{
+    m_team = team;
 }
 
 void CharactersScreen::initialize()
@@ -31,12 +38,13 @@ void CharactersScreen::initialize()
 Rectangle CharactersScreen::searchBoxBounds() const
 {
     // Sits in the library header row so it never overlaps the card grid.
-    return Rectangle{700.0f, 122.0f, 260.0f, 32.0f};
+    return Rectangle{700.0f, 112.0f, 260.0f, 32.0f};
 }
 
 Rectangle CharactersScreen::backButtonBounds() const
 {
-    return Rectangle{50.0f, 28.0f, 86.0f, 34.0f};
+    // Matches EnemiesScreen: right of the 270px sidebar.
+    return Rectangle{286.0f, 28.0f, 86.0f, 34.0f};
 }
 
 float CharactersScreen::manualContentTop() const
@@ -46,8 +54,138 @@ float CharactersScreen::manualContentTop() const
 
 Rectangle CharactersScreen::manualFieldBounds(int index) const
 {
-    float top = manualContentTop() + 90.0f + static_cast<float>(index) * 40.0f;
-    return Rectangle{150.0f, top, 200.0f, 30.0f};
+    // Two columns x five rows: left HP/ATK/DEF/SPD/CRIT, right the rest.
+    int col = index / 5;
+    int row = index % 5;
+    float top = manualContentTop() + 80.0f + static_cast<float>(row) * 34.0f;
+    float x = (col == 0) ? 410.0f : 800.0f;
+    return Rectangle{x, top, 200.0f, 28.0f};
+}
+
+Rectangle CharactersScreen::extraFieldBounds(int index) const
+{
+    // Other bonuses: 3 cols x 3 rows at right; base override: 4-in-a-row.
+    if (index < 9)
+    {
+        int col = index % 3;
+        int row = index / 3;
+        return Rectangle{720.0f + col * 210.0f, 594.0f + row * 44.0f, 190.0f, 28.0f};
+    }
+    int col = index - 9;
+    return Rectangle{720.0f + col * 160.0f, 755.0f, 140.0f, 28.0f};
+}
+
+Rectangle CharactersScreen::baseToggleBounds() const
+{
+    return Rectangle{720.0f, 712.0f, 240.0f, 28.0f};
+}
+
+Rectangle CharactersScreen::levelMinusBounds() const
+{
+    return Rectangle{1020.0f, 712.0f, 30.0f, 28.0f};
+}
+
+Rectangle CharactersScreen::levelPlusBounds() const
+{
+    return Rectangle{1100.0f, 712.0f, 30.0f, 28.0f};
+}
+
+bool CharactersScreen::extraFieldIsPercent(int index) const
+{
+    // Index 3 is flat SPD; 9-12 are flat base stats; rest are percent-numbers.
+    if (index == 3 || index >= 9)
+        return false;
+    return true;
+}
+
+const CharacterInfo* CharactersScreen::selectedInfo() const
+{
+    if (m_selectedCharacterId.empty())
+        return nullptr;
+    return m_characters.get(m_selectedCharacterId);
+}
+
+CharacterLoadout& CharactersScreen::loadoutFor(const std::string& characterId)
+{
+    auto it = m_loadouts.find(characterId);
+    if (it == m_loadouts.end())
+    {
+        m_loadouts[characterId] = CharacterLoadout{};
+        it = m_loadouts.find(characterId);
+    }
+    ensureLoadoutDefaults(it->second);
+    return it->second;
+}
+
+std::string& CharactersScreen::extraFieldText(int index)
+{
+    return m_extraTexts[static_cast<size_t>(index)];
+}
+
+void CharactersScreen::syncExtraTexts()
+{
+    // Refresh every unfocused buffer from the loadout so edits made in the
+    // relic/LC screens show up here without clobbering active typing.
+    const CharacterInfo* info = selectedInfo();
+    if (info == nullptr)
+        return;
+    const CharacterLoadout& lo = loadoutFor(info->id);
+    const double pct[9] = {
+        lo.otherBonuses.atkPct, lo.otherBonuses.hpPct, lo.otherBonuses.defPct,
+        lo.otherBonuses.flatSpd, lo.otherBonuses.critRate, lo.otherBonuses.critDmg,
+        lo.otherBonuses.elemDmgPct, lo.otherBonuses.resPen, lo.otherBonuses.ehr
+    };
+    const char* pctKeys[9] = {
+        "atk_pct", "hp_pct", "def_pct", "spd", "crit_rate_pct",
+        "crit_dmg_pct", "atk_pct", "atk_pct", "effect_hit_rate_pct"
+    };
+    for (int i = 0; i < 9; ++i)
+    {
+        if (i == m_focusedExtraField)
+            continue;
+        double shown = extraFieldIsPercent(i) ? pct[i] * 100.0 : pct[i];
+        m_extraTexts[static_cast<size_t>(i)] = formatStatValueText(shown, pctKeys[i]);
+    }
+    const double base[4] = {
+        lo.manualBase.hp, lo.manualBase.atk, lo.manualBase.def, lo.manualBase.spd
+    };
+    for (int i = 0; i < 4; ++i)
+    {
+        int idx = 9 + i;
+        if (idx == m_focusedExtraField)
+            continue;
+        m_extraTexts[static_cast<size_t>(idx)] = formatStatValueText(base[i], "hp");
+    }
+}
+
+void CharactersScreen::commitExtraField(int index)
+{
+    const CharacterInfo* info = selectedInfo();
+    if (info == nullptr)
+        return;
+    CharacterLoadout& lo = loadoutFor(info->id);
+    std::string& text = m_extraTexts[static_cast<size_t>(index)];
+    double number = 0.0;
+    try { number = text.empty() ? 0.0 : std::stod(text); }
+    catch (...) { number = 0.0; }
+    double value = extraFieldIsPercent(index) ? number / 100.0 : number;
+    switch (index)
+    {
+        case 0: lo.otherBonuses.atkPct = value; break;
+        case 1: lo.otherBonuses.hpPct = value; break;
+        case 2: lo.otherBonuses.defPct = value; break;
+        case 3: lo.otherBonuses.flatSpd = value; break;
+        case 4: lo.otherBonuses.critRate = value; break;
+        case 5: lo.otherBonuses.critDmg = value; break;
+        case 6: lo.otherBonuses.elemDmgPct = value; break;
+        case 7: lo.otherBonuses.resPen = value; break;
+        case 8: lo.otherBonuses.ehr = value; break;
+        case 9: lo.manualBase.hp = value; break;
+        case 10: lo.manualBase.atk = value; break;
+        case 11: lo.manualBase.def = value; break;
+        case 12: lo.manualBase.spd = value; break;
+        default: break;
+    }
 }
 
 int CharactersScreen::parseStatText(const std::string& text)
@@ -66,12 +204,26 @@ int CharactersScreen::parseStatText(const std::string& text)
     return value;
 }
 
+double CharactersScreen::parsePercentText(const std::string& text)
+{
+    if (text.empty())
+        return 0.0;
+    try { return std::stod(text) / 100.0; }
+    catch (...) { return 0.0; }
+}
+
 void CharactersScreen::commitManualTexts()
 {
-    m_manualConfig.hp = parseStatText(m_manualHpText);
-    m_manualConfig.atk = parseStatText(m_manualAtkText);
-    m_manualConfig.def = parseStatText(m_manualDefText);
-    m_manualConfig.spd = parseStatText(m_manualSpdText);
+    m_manualConfig.hp = parseStatText(m_manualTexts[0]);
+    m_manualConfig.atk = parseStatText(m_manualTexts[1]);
+    m_manualConfig.def = parseStatText(m_manualTexts[2]);
+    m_manualConfig.spd = parseStatText(m_manualTexts[3]);
+    m_manualConfig.critRate = parsePercentText(m_manualTexts[4]);
+    m_manualConfig.critDmg = parsePercentText(m_manualTexts[5]);
+    m_manualConfig.elemDmg = parsePercentText(m_manualTexts[6]);
+    m_manualConfig.resPen = parsePercentText(m_manualTexts[7]);
+    m_manualConfig.ehr = parsePercentText(m_manualTexts[8]);
+    m_manualConfig.effectRes = parsePercentText(m_manualTexts[9]);
 }
 
 void CharactersScreen::syncManualCharacterId()
@@ -133,7 +285,7 @@ void CharactersScreen::update(float dt)
     if (m_manualStatsMode && clicked)
     {
         int hitField = -1;
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < kManualFieldCount; ++i)
         {
             if (CheckCollisionPointRec(mouse, manualFieldBounds(i)))
             {
@@ -154,28 +306,96 @@ void CharactersScreen::update(float dt)
         }
     }
 
+    // Build-tab component editors (Sec 22.2): other bonuses, base toggle,
+    // base values, level stepper. Only for the selected character.
+    if (!m_manualStatsMode && selectedInfo() != nullptr)
+    {
+        syncExtraTexts();
+        if (clicked)
+        {
+            CharacterLoadout& lo = loadoutFor(m_selectedCharacterId);
+            bool hitSomething = false;
+            for (int i = 0; i < kExtraFieldCount; ++i)
+            {
+                // Base fields are inert unless the override is enabled.
+                if (i >= 9 && !lo.manualBase.useOverride)
+                    continue;
+                if (CheckCollisionPointRec(mouse, extraFieldBounds(i)))
+                {
+                    if (m_focusedExtraField >= 0)
+                        commitExtraField(m_focusedExtraField);
+                    m_focusedExtraField = i;
+                    hitSomething = true;
+                    break;
+                }
+            }
+            if (!hitSomething && m_focusedExtraField >= 0)
+            {
+                commitExtraField(m_focusedExtraField);
+                m_focusedExtraField = -1;
+            }
+            if (!hitSomething)
+            {
+                if (CheckCollisionPointRec(mouse, baseToggleBounds()))
+                {
+                    lo.manualBase.useOverride = !lo.manualBase.useOverride;
+                    if (lo.manualBase.useOverride)
+                    {
+                        // Start from database values so the player edits
+                        // real numbers instead of a blank form.
+                        const CharacterInfo* info = selectedInfo();
+                        auto base = [&](const char* k) {
+                            auto it = info->baseStats.find(k);
+                            return it != info->baseStats.end() ? it->second : 0.0;
+                        };
+                        lo.manualBase.hp = base("hp");
+                        lo.manualBase.atk = base("atk");
+                        lo.manualBase.def = base("def");
+                        lo.manualBase.spd = base("spd");
+                    }
+                }
+                else if (CheckCollisionPointRec(mouse, levelMinusBounds()))
+                {
+                    lo.level = std::max(1, lo.level - 1);
+                }
+                else if (CheckCollisionPointRec(mouse, levelPlusBounds()))
+                {
+                    lo.level = std::min(90, lo.level + 1);
+                }
+            }
+        }
+    }
+    else if (m_focusedExtraField >= 0)
+    {
+        commitExtraField(m_focusedExtraField);
+        m_focusedExtraField = -1;
+    }
+
     std::string* focusedText = nullptr;
+    bool focusedIsDecimal = false;
     if (m_manualStatsMode && m_focusedManualField >= 0)
     {
-        switch (m_focusedManualField)
-        {
-            case 0: focusedText = &m_manualHpText; break;
-            case 1: focusedText = &m_manualAtkText; break;
-            case 2: focusedText = &m_manualDefText; break;
-            case 3: focusedText = &m_manualSpdText; break;
-            default: break;
-        }
+        focusedText = &m_manualTexts[static_cast<size_t>(m_focusedManualField)];
+        focusedIsDecimal = (m_focusedManualField >= 4);
+    }
+    else if (!m_manualStatsMode && m_focusedExtraField >= 0)
+    {
+        focusedText = &extraFieldText(m_focusedExtraField);
+        focusedIsDecimal = true;
     }
 
     // Route typed characters to exactly one destination per frame:
-    // the focused manual field wins, otherwise the library search box.
+    // focused stat field wins, otherwise the library search box.
     int key = GetCharPressed();
     while (key > 0)
     {
         if (focusedText != nullptr)
         {
-            // Manual stats are whole numbers: digits only, max 5 chars.
-            if (key >= '0' && key <= '9' && focusedText->size() < 5)
+            bool isDigit = key >= '0' && key <= '9';
+            bool isDot = focusedIsDecimal && key == '.' &&
+                         focusedText->find('.') == std::string::npos;
+            size_t cap = focusedIsDecimal ? 8 : 5;
+            if ((isDigit || isDot) && focusedText->size() < cap)
                 focusedText->push_back(static_cast<char>(key));
         }
         else if (key >= 32 && key <= 126 && m_searchQuery.size() < 32)
@@ -191,8 +411,16 @@ void CharactersScreen::update(float dt)
             focusedText->pop_back();
         if (IsKeyPressed(KEY_TAB))
         {
-            commitManualTexts();
-            m_focusedManualField = (m_focusedManualField + 1) % 4;
+            if (m_manualStatsMode)
+            {
+                commitManualTexts();
+                m_focusedManualField = (m_focusedManualField + 1) % kManualFieldCount;
+            }
+            else
+            {
+                commitExtraField(m_focusedExtraField);
+                m_focusedExtraField = (m_focusedExtraField + 1) % kExtraFieldCount;
+            }
         }
     }
     else if (IsKeyPressed(KEY_BACKSPACE) && !m_searchQuery.empty())
@@ -200,16 +428,23 @@ void CharactersScreen::update(float dt)
         m_searchQuery.pop_back();
     }
 
-    // ENTER commits manual input (and advances) or confirms grid selection.
+    // ENTER commits field input (and advances) or confirms grid selection.
     // ESC defocuses a field first; with nothing focused it requests back.
     if (IsKeyPressed(KEY_ENTER))
     {
         if (m_focusedManualField >= 0)
         {
             commitManualTexts();
-            m_focusedManualField = (m_focusedManualField + 1) % 4;
+            m_focusedManualField = (m_focusedManualField + 1) % kManualFieldCount;
             if (m_focusedManualField == 0)
                 m_focusedManualField = -1; // full pass done: defocus
+        }
+        else if (m_focusedExtraField >= 0)
+        {
+            commitExtraField(m_focusedExtraField);
+            m_focusedExtraField = (m_focusedExtraField + 1) % kExtraFieldCount;
+            if (m_focusedExtraField == 0)
+                m_focusedExtraField = -1;
         }
         else if (!m_selectedCharacterId.empty())
         {
@@ -224,6 +459,11 @@ void CharactersScreen::update(float dt)
         {
             commitManualTexts();
             m_focusedManualField = -1;
+        }
+        else if (m_focusedExtraField >= 0)
+        {
+            commitExtraField(m_focusedExtraField);
+            m_focusedExtraField = -1;
         }
         else
         {
@@ -283,7 +523,8 @@ void CharactersScreen::update(float dt)
 
 void CharactersScreen::draw()
 {
-    DrawText("Characters — Team Builder", 300, 30, 34, RAYWHITE);
+    // NOTE: hyphen, not em-dash — the default font has no em-dash glyph.
+    DrawText("Characters - Team Builder", 390, 30, 34, RAYWHITE);
     DrawText("Configure characters for combat simulation", 312, 72, 16,
              Color{145, 150, 164, 255});
     DrawLine(310, 105, GetScreenWidth() - 30, 105, Color{48, 52, 64, 255});
@@ -294,31 +535,40 @@ void CharactersScreen::draw()
     DrawText("< Back", static_cast<int>(backButtonBounds().x + 12),
              static_cast<int>(backButtonBounds().y + 9), 15, RAYWHITE);
 
-    // --- Mode Tabs ---
-    float tabY = kTabY;
-    m_buildTabBounds = { kTabOriginX, tabY, kTabW, kTabH };
-    m_manualTabBounds = { kTabOriginX + kTabW + kTabGap, tabY, kTabW, kTabH };
+    // --- Mode Tabs (right-aligned so the full labels fit on screen) ---
+    float tabX = static_cast<float>(GetScreenWidth()) - 30.0f -
+        (2.0f * kTabW + kTabGap);
+    m_buildTabBounds = { tabX, kTabY, kTabW, kTabH };
+    m_manualTabBounds = { tabX + kTabW + kTabGap, kTabY, kTabW, kTabH };
 
     // Build from Components tab
     Color buildColor = m_manualStatsMode ? Color{55, 59, 72, 255} : Color{44, 52, 70, 255};
     Color buildBorder = m_manualStatsMode ? Color{75, 80, 100, 255} : Color{115, 140, 190, 255};
     DrawRectangleRounded(m_buildTabBounds, 0.15f, 8, buildColor);
     DrawRectangleRoundedLines(m_buildTabBounds, 0.15f, 8, buildBorder);
-    DrawText("Build from Components", static_cast<int>(m_buildTabBounds.x + 10),
-             static_cast<int>(m_buildTabBounds.y + 10), 16,
-             m_manualStatsMode ? Color{130, 135, 148, 255} : RAYWHITE);
+    {
+        const char* label = "Build from Components";
+        int labelW = MeasureText(label, 14);
+        DrawText(label, static_cast<int>(m_buildTabBounds.x + (kTabW - labelW) / 2.0f),
+                 static_cast<int>(m_buildTabBounds.y + 12), 14,
+                 m_manualStatsMode ? Color{130, 135, 148, 255} : RAYWHITE);
+    }
 
     // Enter Completed Character tab
     Color manualColor = !m_manualStatsMode ? Color{55, 59, 72, 255} : Color{44, 52, 70, 255};
     Color manualBorder = !m_manualStatsMode ? Color{75, 80, 100, 255} : Color{115, 140, 190, 255};
     DrawRectangleRounded(m_manualTabBounds, 0.15f, 8, manualColor);
     DrawRectangleRoundedLines(m_manualTabBounds, 0.15f, 8, manualBorder);
-    DrawText("Enter Completed Character", static_cast<int>(m_manualTabBounds.x + 10),
-             static_cast<int>(m_manualTabBounds.y + 10), 16,
-             !m_manualStatsMode ? Color{130, 135, 148, 255} : RAYWHITE);
+    {
+        const char* label = "Enter Completed Character";
+        int labelW = MeasureText(label, 14);
+        DrawText(label, static_cast<int>(m_manualTabBounds.x + (kTabW - labelW) / 2.0f),
+                 static_cast<int>(m_manualTabBounds.y + 12), 14,
+                 !m_manualStatsMode ? Color{130, 135, 148, 255} : RAYWHITE);
+    }
 
     // --- Character Grid ---
-    DrawText("CHARACTER LIBRARY", 50, 130, 17, Color{180, 185, 198, 255});
+    DrawText("CHARACTER LIBRARY", 310, 118, 17, Color{180, 185, 198, 255});
 
     // Search box (same bounds as update() hit-testing)
     {
@@ -361,19 +611,13 @@ void CharactersScreen::draw()
             continue;
 
         // Draw character card
+        // NOTE: no extra text is drawn over the card bottom — CharacterCard
+        // already renders the character name at bounds.y + height - 25.
         bool selected = (m_selectedCharacterId == m_filteredRoster[i]->id);
         CharacterCard::draw(m_assets, m_filteredRoster[i]->id, r, selected);
 
-        // Show workflow indicator based on current mode
-        if (!m_manualStatsMode) {
-            // Build from Components: show small note
-            std::string note = "Build from components";
-            int noteW = MeasureText(note.c_str(), 10);
-            DrawText(note.c_str(),
-                     static_cast<int>(r.x + kLibraryCardW/2 - noteW/2),
-                     static_cast<int>(r.y + kLibraryCardH - 25), 10, GRAY);
-        } else {
-            // Enter Completed: show indicator
+        // In manual mode, tag the card corner (clear of the bottom name).
+        if (m_manualStatsMode) {
             DrawText("Entered", static_cast<int>(r.x + 5), static_cast<int>(r.y + 5), 10, YELLOW);
         }
     }
@@ -383,112 +627,174 @@ void CharactersScreen::draw()
     float modeContentY = manualContentTop();
 
     if (!m_manualStatsMode) {
-        // --- BUILD FROM COMPONENTS WORKFLOW ---
-        DrawText("BUILD FROM COMPONENTS", 50, static_cast<int>(modeContentY), 18, WHITE);
-        DrawText("Configure character stats using base stats, Light Cone, and relics.", 52, static_cast<int>(modeContentY + 25), 14, LIGHTGRAY);
+        // --- BUILD FROM COMPONENTS WORKFLOW (Sec 22.2/22.3) ---
+        DrawText("BUILD FROM COMPONENTS", 310, static_cast<int>(modeContentY), 18, WHITE);
+        DrawText("Totals resolve automatically from base + Light Cone + gear + bonuses.", 312, static_cast<int>(modeContentY + 25), 14, LIGHTGRAY);
 
-        // Display current character's computed stats if a character is selected
-        if (!m_selectedCharacterId.empty()) {
-            // Find the character info
-            const CharacterInfo* ci = nullptr;
-            for (const auto& c : m_characters.all()) {
-                if (c.id == m_selectedCharacterId) {
-                    ci = &c;
-                    break;
-                }
+        const CharacterInfo* ci = selectedInfo();
+        if (ci != nullptr) {
+            CharacterLoadout& lo = loadoutFor(ci->id);
+            loadout::ResolvedTotals totals = loadout::resolveTotals(*ci, lo, m_lightCones);
+
+            int yPos = static_cast<int>(modeContentY + 55);
+            DrawText(("Final HP:  " + std::to_string(static_cast<int>(totals.hp))).c_str(), 310, yPos, 15, WHITE);
+            yPos += 24;
+            DrawText(("Final ATK: " + std::to_string(static_cast<int>(totals.atk))).c_str(), 310, yPos, 15, WHITE);
+            yPos += 24;
+            DrawText(("Final DEF: " + std::to_string(static_cast<int>(totals.def))).c_str(), 310, yPos, 15, WHITE);
+            yPos += 24;
+            DrawText(("Final SPD: " + std::to_string(static_cast<int>(totals.spd))).c_str(), 310, yPos, 15, WHITE);
+            yPos += 30;
+
+            std::string baseSrc = lo.manualBase.useOverride ? "Base: custom" : "Base: database";
+            DrawText(baseSrc.c_str(), 310, yPos, 13, LIGHTGRAY);
+            yPos += 22;
+            const LightConeInfo* lc = lo.lightConeId.empty() ? nullptr : m_lightCones.get(lo.lightConeId);
+            std::string lcLabel = std::string("Light Cone: ") + (lc != nullptr ? lc->name : "(none — see LIGHT CONES)");
+            DrawText(lcLabel.c_str(), 310, yPos, 13, LIGHTGRAY);
+            yPos += 22;
+            std::string setLabel = "Relics: " + (lo.relicSetA.empty() ? "(none — see RELICS)" : lo.relicSetA);
+            if (!lo.relicFourPiece && !lo.relicSetB.empty())
+                setLabel += " + " + lo.relicSetB;
+            if (!lo.planarSet.empty())
+                setLabel += " / " + lo.planarSet;
+            DrawText(setLabel.c_str(), 310, yPos, 13, LIGHTGRAY);
+            yPos += 22;
+            DrawText("Edit gear in RELICS, Light Cone in LIGHT CONES.", 310, yPos, 13, GRAY);
+
+            // --- Right column: other bonuses / base override / level ---
+            DrawText("OTHER BONUSES", 720, static_cast<int>(modeContentY), 15, Color{180, 185, 198, 255});
+            const char* extraNames[kExtraFieldCount] = {
+                "ATK%", "HP%", "DEF%", "SPD",
+                "CRIT%", "CRIT DMG%", "DMG%", "RES PEN%", "EHR%",
+                "Base HP", "Base ATK", "Base DEF", "Base SPD"
+            };
+            for (int i = 0; i < kExtraFieldCount; ++i)
+            {
+                // Base fields live in their own row below; skip them here.
+                if (i >= 9)
+                    continue;
+                Rectangle field = extraFieldBounds(i);
+                const bool focused = (m_focusedExtraField == i);
+                DrawText(extraNames[i], static_cast<int>(field.x),
+                         static_cast<int>(field.y - 15), 12, LIGHTGRAY);
+                DrawRectangleRounded(field, 0.2f, 8,
+                    focused ? Color{44, 52, 70, 255} : Color{28, 31, 41, 255});
+                DrawRectangleRoundedLines(field, 0.2f, 8,
+                    focused ? Color{115, 140, 190, 255} : Color{55, 59, 72, 255});
+                std::string shown = m_extraTexts[static_cast<size_t>(i)];
+                if (focused)
+                    shown += "_";
+                if (shown.empty() && !focused)
+                    shown = "-";
+                DrawText(shown.c_str(), static_cast<int>(field.x + 10),
+                         static_cast<int>(field.y + 6), 14,
+                         m_extraTexts[static_cast<size_t>(i)].empty() && !focused ? GRAY : RAYWHITE);
             }
 
-            if (ci) {
-                int yPos = static_cast<int>(modeContentY + 50);
-                std::string idLabel = "ID: " + ci->id;
-                DrawText(idLabel.c_str(), 50, yPos, 14, LIGHTGRAY);
+            Rectangle toggle = baseToggleBounds();
+            DrawRectangleRounded(toggle, 0.2f, 8,
+                lo.manualBase.useOverride ? Color{44, 52, 70, 255} : Color{28, 31, 41, 255});
+            DrawRectangleRoundedLines(toggle, 0.2f, 8, Color{55, 59, 72, 255});
+            std::string toggleLabel = std::string("Custom base: ") +
+                (lo.manualBase.useOverride ? "ON" : "OFF");
+            DrawText(toggleLabel.c_str(), static_cast<int>(toggle.x + 12),
+                     static_cast<int>(toggle.y + 7), 13, RAYWHITE);
 
-                yPos += 25;
-                std::string hpLabel = "Base HP: " + std::to_string(static_cast<int>(ci->baseStats.at("hp")));
-                DrawText(hpLabel.c_str(), 50, yPos, 14, LIGHTGRAY);
+            DrawText("Lv", 990, 719, 14, WHITE);
+            Rectangle minusR = levelMinusBounds();
+            Rectangle plusR = levelPlusBounds();
+            DrawRectangleRounded(minusR, 0.2f, 6, Color{28, 31, 41, 255});
+            DrawRectangleRoundedLines(minusR, 0.2f, 6, Color{55, 59, 72, 255});
+            DrawText("-", static_cast<int>(minusR.x + 11), static_cast<int>(minusR.y + 5), 15, RAYWHITE);
+            DrawText(std::to_string(lo.level).c_str(), 1058, 719, 14, RAYWHITE);
+            DrawRectangleRounded(plusR, 0.2f, 6, Color{28, 31, 41, 255});
+            DrawRectangleRoundedLines(plusR, 0.2f, 6, Color{55, 59, 72, 255});
+            DrawText("+", static_cast<int>(plusR.x + 10), static_cast<int>(plusR.y + 5), 15, RAYWHITE);
 
-                yPos += 25;
-                std::string atkLabel = "Base ATK: " + std::to_string(static_cast<int>(ci->baseStats.at("atk")));
-                DrawText(atkLabel.c_str(), 50, yPos, 14, LIGHTGRAY);
-
-                yPos += 25;
-                std::string spdLabel = "Base SPD: " + std::to_string(static_cast<int>(ci->baseStats.at("spd")));
-                DrawText(spdLabel.c_str(), 50, yPos, 14, LIGHTGRAY);
-
-                yPos += 40;
-                DrawText("Light Cone:", 50, yPos, 14, WHITE);
-                yPos += 25;
-
-                // Light cone selection - simplified: show available LCs for this path
-                auto lcs = m_lightCones.byPath(ci->path);
-                if (!lcs.empty()) {
-                    DrawText(lcs[0]->name.c_str(), 70, yPos, 14, LIGHTGRAY);
-                } else {
-                    DrawText("(no Light Cones loaded)", 70, yPos, 14, GRAY);
-                }
-
-                yPos += 40;
-                DrawText("Relic Sets:", 50, yPos, 14, WHITE);
-                yPos += 25;
-
-                auto sets = m_relicSets.all();
-                if (!sets.empty()) {
-                    DrawText(sets[0].name.c_str(), 70, yPos, 14, LIGHTGRAY);
-                } else {
-                    DrawText("(no relic sets loaded)", 70, yPos, 14, GRAY);
-                }
-
-                yPos += 40;
-                DrawText("Configure substats (ATK%, DEF%, HP%, SPD%, CRIT%) in the simulation screen.", 50, yPos, 14, LIGHTGRAY);
+            for (int i = 9; i < kExtraFieldCount; ++i)
+            {
+                Rectangle field = extraFieldBounds(i);
+                const bool focused = (m_focusedExtraField == i);
+                const bool enabled = lo.manualBase.useOverride;
+                DrawText(extraNames[i], static_cast<int>(field.x),
+                         static_cast<int>(field.y - 15), 12,
+                         enabled ? LIGHTGRAY : GRAY);
+                DrawRectangleRounded(field, 0.2f, 8,
+                    focused ? Color{44, 52, 70, 255} : Color{22, 24, 31, 255});
+                DrawRectangleRoundedLines(field, 0.2f, 8,
+                    focused ? Color{115, 140, 190, 255} : Color{55, 59, 72, 255});
+                std::string shown = enabled ? m_extraTexts[static_cast<size_t>(i)] : "";
+                if (focused)
+                    shown += "_";
+                if (shown.empty() && !focused)
+                    shown = "-";
+                DrawText(shown.c_str(), static_cast<int>(field.x + 10),
+                         static_cast<int>(field.y + 6), 14,
+                         (!enabled || m_extraTexts[static_cast<size_t>(i)].empty()) && !focused ? GRAY : RAYWHITE);
             }
+            DrawText("% fields take percent-numbers (15 = 15%). Set bonuses: no data, not applied.",
+                     720, 812, 12, GRAY);
         }
 
         // Instruction
         if (m_selectedCharacterId.empty()) {
-            DrawText("Select a character from the grid to configure their build.", 50, static_cast<int>(modeContentY + 200), 16, GRAY);
+            DrawText("Select a character from the grid to configure their build.", 310, static_cast<int>(modeContentY + 200), 16, GRAY);
         }
     }
     else {
-        // --- ENTER COMPLETED CHARACTER WORKFLOW ---
-        DrawText("ENTER COMPLETED CHARACTER", 50, static_cast<int>(modeContentY), 18, WHITE);
-        DrawText("Click a field and type digits. ENTER commits and advances, TAB cycles.", 52, static_cast<int>(modeContentY + 25), 14, LIGHTGRAY);
+        // --- ENTER COMPLETED CHARACTER WORKFLOW (Sec 22.4) ---
+        DrawText("ENTER COMPLETED CHARACTER", 310, static_cast<int>(modeContentY), 18, WHITE);
+        DrawText("Type final combat stats. Percent fields take percent-numbers (70 = 70%).", 312, static_cast<int>(modeContentY + 25), 14, LIGHTGRAY);
 
         std::string charIdLabel = "Character: " +
             (m_manualConfig.characterId.empty() ? "(select from grid above)" : m_manualConfig.characterId);
-        DrawText(charIdLabel.c_str(), 50, static_cast<int>(modeContentY + 48), 14, LIGHTGRAY);
+        DrawText(charIdLabel.c_str(), 310, static_cast<int>(modeContentY + 48), 14, LIGHTGRAY);
 
-        const char* fieldNames[4] = {"HP", "ATK", "DEF", "SPD"};
-        const std::string* fieldTexts[4] = {&m_manualHpText, &m_manualAtkText, &m_manualDefText, &m_manualSpdText};
+        const char* fieldNames[kManualFieldCount] = {
+            "HP", "ATK", "DEF", "SPD", "CRIT%",
+            "CRIT DMG%", "DMG%", "RES PEN%", "EHR%", "EFF RES%"
+        };
+        const float labelX[kManualFieldCount] = {
+            330.0f, 330.0f, 330.0f, 330.0f, 330.0f,
+            700.0f, 700.0f, 700.0f, 700.0f, 700.0f
+        };
 
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < kManualFieldCount; ++i)
         {
             Rectangle field = manualFieldBounds(i);
             const bool focused = (m_focusedManualField == i);
-            DrawText(fieldNames[i], 50, static_cast<int>(field.y + 7), 14, WHITE);
+            DrawText(fieldNames[i], static_cast<int>(labelX[i]), static_cast<int>(field.y + 7), 14, WHITE);
             DrawRectangleRounded(field, 0.2f, 8,
                 focused ? Color{44, 52, 70, 255} : Color{28, 31, 41, 255});
             DrawRectangleRoundedLines(field, 0.2f, 8,
                 focused ? Color{115, 140, 190, 255} : Color{55, 59, 72, 255});
-            std::string shown = *fieldTexts[i];
+            std::string shown = m_manualTexts[static_cast<size_t>(i)];
             if (focused)
                 shown += "_";
             if (shown.empty() && !focused)
                 shown = "-";
             DrawText(shown.c_str(), static_cast<int>(field.x + 10),
-                     static_cast<int>(field.y + 7), 15,
-                     fieldTexts[i]->empty() && !focused ? GRAY : RAYWHITE);
+                     static_cast<int>(field.y + 6), 14,
+                     m_manualTexts[static_cast<size_t>(i)].empty() && !focused ? GRAY : RAYWHITE);
         }
 
-        int summaryY = static_cast<int>(manualFieldBounds(3).y + 40.0f);
-        std::string summary = "Entered Stats (manual): HP " + std::to_string(m_manualConfig.hp) +
-            " / ATK " + std::to_string(m_manualConfig.atk) +
-            " / DEF " + std::to_string(m_manualConfig.def) +
-            " / SPD " + std::to_string(m_manualConfig.spd);
-        DrawText(summary.c_str(), 50, summaryY, 14, YELLOW);
+        int summaryY = static_cast<int>(manualFieldBounds(9).y + 38.0f);
+        std::string summary = "Manual: HP " + std::to_string(m_manualConfig.hp) +
+            " ATK " + std::to_string(m_manualConfig.atk) +
+            " DEF " + std::to_string(m_manualConfig.def) +
+            " SPD " + std::to_string(m_manualConfig.spd);
+        DrawText(summary.c_str(), 310, summaryY, 13, YELLOW);
+        std::string summary2 = "CRIT " + std::to_string(static_cast<int>(m_manualConfig.critRate * 100.0)) +
+            "%/" + std::to_string(static_cast<int>(m_manualConfig.critDmg * 100.0)) +
+            "% DMG " + std::to_string(static_cast<int>(m_manualConfig.elemDmg * 100.0)) +
+            "% PEN " + std::to_string(static_cast<int>(m_manualConfig.resPen * 100.0)) +
+            "% EHR " + std::to_string(static_cast<int>(m_manualConfig.ehr * 100.0)) + "%";
+        DrawText(summary2.c_str(), 310, summaryY + 18, 13, YELLOW);
     }
 
     // --- Selection prompt (input itself is handled in update()) ---
-    DrawText("Click a portrait or press ENTER to select, ESC to return", 50, GetScreenHeight() - 50, 16, GRAY);
+    DrawText("Click a portrait or press ENTER to select, ESC to return", 310, GetScreenHeight() - 50, 16, GRAY);
 }
 
 bool CharactersScreen::consumeSelection(std::string& outCharacterId)
