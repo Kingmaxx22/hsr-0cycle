@@ -35,6 +35,11 @@ bool App::initialize()
     teamBuilder = std::make_unique<TeamBuilderScreen>(assets, characters);
     teamBuilder->initialize();
 
+    charactersScreen =
+        std::make_unique<CharactersScreen>(
+            assets, characters, relicSets, lightCones);
+    charactersScreen->initialize();
+
     relicRoster = std::make_unique<RelicRosterScreen>(assets, characters);
     relicRoster->initialize();
 
@@ -81,7 +86,7 @@ void App::goToEnemiesScreen()
     activeNav = 4;
 }
 
-void App::goToSimulationScreen()
+void App::goToSimulationScreen(int navIndex)
 {
     // Pass selected enemy from EnemiesScreen if available
     std::string selectedEnemy = enemiesScreen->getSelectedEnemyId();
@@ -89,7 +94,14 @@ void App::goToSimulationScreen()
         simulationScreen->setSelectedEnemy(selectedEnemy);
     }
     activeView = ActiveView::Simulation;
-    activeNav = 5;
+    // Preserve the clicked sidebar highlight (ROTATION=5, SIMULATE=6).
+    activeNav = navIndex;
+}
+
+void App::goToCharactersScreen()
+{
+    activeView = ActiveView::Characters;
+    activeNav = 1;
 }
 
 void App::run()
@@ -101,6 +113,7 @@ void App::run()
         switch (activeView)
         {
             case ActiveView::TeamBuilder: teamBuilder->update(dt); break;
+            case ActiveView::Characters: charactersScreen->update(dt); break;
             case ActiveView::RelicRoster: relicRoster->update(dt); break;
             case ActiveView::RelicEditor: relicEditor->update(dt); break;
             case ActiveView::LightCone:   lightConeScreen->update(dt); break;
@@ -118,6 +131,10 @@ void App::run()
             activeView = ActiveView::TeamBuilder;
             activeNav = 0;
         }
+        else if (navClick == 1)
+        {
+            goToCharactersScreen();
+        }
         else if (navClick == 2)
         {
             goToLightConeScreen(teamBuilder->getSelectedCharacter());
@@ -130,9 +147,11 @@ void App::run()
         {
             goToEnemiesScreen();
         }
-        else if (navClick == 5)
+        else if (navClick == 5 || navClick == 6)
         {
-            goToSimulationScreen();
+            // ROTATION (5) and SIMULATE (6) share the simulation view:
+            // rotation editing lives inside SimulationScreen.
+            goToSimulationScreen(navClick);
         }
         else if (navClick >= 0)
         {
@@ -149,6 +168,26 @@ void App::run()
                 if (teamBuilder->consumeEditorRequest(requested))
                     goToRelicEditor(requested);
 
+                break;
+            }
+
+            case ActiveView::Characters:
+            {
+                charactersScreen->draw();
+                std::string selected;
+
+                // Selection is acknowledged for now; team handoff comes later.
+                if (charactersScreen->consumeSelection(selected))
+                {
+                    TraceLog(LOG_INFO, "CharactersScreen selected: %s",
+                             selected.c_str());
+                }
+
+                if (charactersScreen->consumeBackRequest())
+                {
+                    activeView = ActiveView::TeamBuilder;
+                    activeNav = 0;
+                }
                 break;
             }
 
@@ -215,6 +254,7 @@ void App::shutdown()
     lightConeScreen.reset();
     relicEditor.reset();
     relicRoster.reset();
+    charactersScreen.reset();
     teamBuilder.reset();
 
     assets.unloadAll();

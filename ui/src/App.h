@@ -8,6 +8,7 @@
 #include "data/EnemyDatabase.h"
 #include "widgets/Sidebar.h"
 #include "screens/TeamBuilderScreen.h"
+#include "screens/CharactersScreen.h"
 #include "screens/Relicrosterscreen.h"
 #include "screens/Reliceditorscreen.h"
 #include "screens/LightConeScreen.h"
@@ -34,6 +35,7 @@ private:
     enum class ActiveView
     {
         TeamBuilder,
+        Characters,
         RelicRoster,
         RelicEditor,
         LightCone,
@@ -44,7 +46,8 @@ private:
     void goToRelicEditor(const std::string& characterId);
     void goToLightConeScreen(const std::string& characterId);
     void goToEnemiesScreen();
-    void goToSimulationScreen();
+    void goToSimulationScreen(int navIndex);
+    void goToCharactersScreen();
 
     AssetManager assets;
     CharacterDatabase characters;
@@ -58,6 +61,7 @@ private:
     ActiveView activeView = ActiveView::TeamBuilder;
 
     std::unique_ptr<TeamBuilderScreen> teamBuilder;
+    std::unique_ptr<CharactersScreen> charactersScreen;
     std::unique_ptr<RelicRosterScreen> relicRoster;
     std::unique_ptr<RelicEditorScreen> relicEditor;
     std::unique_ptr<LightConeScreen> lightConeScreen;

@@ -7,6 +7,7 @@ add_executable(hsr_ui
     src/data/LightConeDatabase.cpp
     src/data/EnemyDatabase.cpp
     src/screens/TeamBuilderScreen.cpp
+    src/screens/CharactersScreen.cpp
     src/screens/Relicrosterscreen.cpp
     src/screens/Reliceditorscreen.cpp
     src/screens/LightConeScreen.cpp
