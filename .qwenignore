@@ -1,13 +1,46 @@
+# Build artifacts
 build/
-.github/
-.git/
+CMakeCache.txt
+CMakeFiles/
 *.o
 *.obj
 *.a
 *.so
+*.dylib
 *.dll
 *.exe
+*.out
+
+# Dependencies / vendored code
+vendor/
+
+# Logs
 *.log
-CMakeFiles/
-CMakeCache.txt
-compile_commands.json
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage / test caches
+coverage/
+htmlcov/
+.coverage
+.mypy_cache/
+.pytest_cache/
+
+# Distribution
+dist/
+*.tar.gz
+*.zip
