@@ -32,6 +32,33 @@ struct CharacterConfig {
     float maxEnergy;
     std::vector<std::string> rotation; // e.g., {"Skill", "Basic", "Basic"}
     bool isAuto;            // If true, use simple AI logic
+    std::string speedNotes;  // Character-specific speed/AV exception notes (informational only)
+
+    // Base stats from character data (before LC/relic bonuses)
+    double baseHp;
+    double baseAtk;
+    double baseDef;
+    double baseSpd;
+
+    // Percentage bonuses (from substats, relics, planar, etc.)
+    double hpPct;
+    double atkPct;
+    double defPct;
+    double spdPct;
+
+    // Flat bonuses (from substats, relics, planar, etc.)
+    double flatHp;
+    double flatAtk;
+    double flatDef;
+    double flatSpd;
+
+    // Light Cone base stats (merged with character BASE stats first, per formula rules)
+    double lightConeBaseHp;
+    double lightConeBaseAtk;
+    double lightConeBaseDef;
+
+    // Whether stats were manually entered (bypass component building workflow)
+    bool manualStats;
 };
 
 // Configuration for the enemy
@@ -76,6 +103,15 @@ public:
         std::string description;
     };
     std::vector<SpeedBreakpoint> calculateBreakpoints(int baseSpeed, int avLimit = 15000);
+
+public:
+    // Stat calculation (derived from CharacterConfig components)
+    // These preserve the formula stages: Base → % → Flat → LC merge
+    // Public: usable by UI for both workflows display
+    double calculateTotalHp(const CharacterConfig& config);
+    double calculateTotalAtk(const CharacterConfig& config);
+    double calculateTotalDef(const CharacterConfig& config);
+    double calculateTotalSpeed(const CharacterConfig& config);
 
 private:
     // Internal state for running simulation

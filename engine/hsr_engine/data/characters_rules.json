@@ -24,7 +24,8 @@
         "crit_dmg_pct": 0.24,
         "break_effect_pct": null,
         "effect_res_pct": null,
-        "effect_hit_rate_pct": null
+"effect_hit_rate_pct": null,
+        "speedNotes": null
       }
     },
     {
@@ -49,8 +50,9 @@
         "crit_rate_pct": 0.12,
         "crit_dmg_pct": null,
         "break_effect_pct": null,
-        "effect_res_pct": null,
-        "effect_hit_rate_pct": null
+"effect_res_pct": null,
+        "effect_hit_rate_pct": null,
+        "speedNotes": null
       }
     },
     {
@@ -257,8 +259,9 @@
         "crit_rate_pct": null,
         "crit_dmg_pct": null,
         "break_effect_pct": null,
-        "effect_res_pct": 0.1,
-        "effect_hit_rate_pct": null
+"effect_res_pct": 0.1,
+        "effect_hit_rate_pct": null,
+        "speedNotes": null
       }
     },
     {
@@ -518,7 +521,8 @@
         "crit_dmg_pct": null,
         "break_effect_pct": null,
         "effect_res_pct": null,
-        "effect_hit_rate_pct": null
+"effect_hit_rate_pct": null,
+        "speedNotes": null
       }
     },
     {
@@ -881,8 +885,9 @@
         "crit_rate_pct": 0.067,
         "crit_dmg_pct": null,
         "break_effect_pct": null,
-        "effect_res_pct": null,
-        "effect_hit_rate_pct": null
+"effect_res_pct": null,
+        "effect_hit_rate_pct": null,
+        "speedNotes": null
       }
     },
     {
@@ -2415,8 +2420,9 @@
         "crit_rate_pct": 0.067,
         "crit_dmg_pct": null,
         "break_effect_pct": null,
-        "effect_res_pct": null,
-        "effect_hit_rate_pct": null
+"effect_res_pct": null,
+        "effect_hit_rate_pct": null,
+        "speedNotes": null
       }
     }
   ]

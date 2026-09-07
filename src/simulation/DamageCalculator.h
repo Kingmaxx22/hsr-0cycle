@@ -132,13 +132,22 @@ struct DefenseMultiplierConfig {
     // Flat DEF reduction (rare)
     double flatDEFReduction;
     
+    // Defense Shred% from debuffs (e.g., Shamans' S3, Welt's S2)
+    // Clamped to 0-1 (0% to 100%), applies before DEF multiplier calculation
+    double shredPercent;
+    
+    // If true, enemy uses Level 100 DEF value instead of actual level (Plight difficulty)
+    bool isPlightDifficulty;
+    
     DefenseMultiplierConfig()
         : attackerLevel(80)      // Default max level
         , enemyBaseDEF(0.0)
         , enemyDEFPercent(0.0)
         , defReductionPercent(0.0)
         , defIgnorePercent(0.0)
-        , flatDEFReduction(0.0) {}
+        , flatDEFReduction(0.0)
+        , shredPercent(0.0)
+        , isPlightDifficulty(false) {}
 };
 
 /**
@@ -184,6 +193,11 @@ enum class EnemyResistanceType {
     Resistant   // Base RES = 40% (enemy resistant to this element)
 };
 
+enum class EnemyVulnerabilityType {
+    Standard,   // Standard vuln, capped at 250% (3.5x) including enemy self-vuln
+    Special     // Special enemy vuln, uncapped (only for Doomsday Beat and Sunday boss)
+};
+
 struct ResistanceMultiplierConfig {
     EnemyResistanceType resistanceType;  // Determines base RES value
     double resPenetration;               // Character's RES Penetration (e.g., 0.20 for 20%)
@@ -191,6 +205,84 @@ struct ResistanceMultiplierConfig {
     ResistanceMultiplierConfig()
         : resistanceType(EnemyResistanceType::Neutral)  // Default 20% base RES
         , resPenetration(0.0) {}
+};
+
+struct VulnerabilityConfig {
+    double sumVULN;          // Sum of all VULN% (player + enemy self-vuln), clamped to 250% max
+    EnemyVulnerabilityType vulnType;  // Standard or Special
+    double specialVulnEnemy; // Special enemy VULN% (uncapped, only for 2 specific enemies)
+    
+    VulnerabilityConfig()
+        : sumVULN(0.0)
+        , vulnType(EnemyVulnerabilityType::Standard)
+        , specialVulnEnemy(0.0) {}
+};
+
+/**
+ * Configuration for Effect Hit Rate calculation.
+ * 
+ * Final Chance = Base Chance × (1 - Effect RES) × (1 + EHR)
+ * 
+ * Rules:
+ * - Final Chance is capped at 100%.
+ * - Effect RES is capped at 100%.
+ * - EHR itself has no upper cap.
+ * 
+ * For MULTI-HIT attacks, use Bernoulli Trials to compute the chance of AT LEAST
+ * ONE successful proc across all hits:
+ * 
+ * At-Least-One Chance = 1 - (1 - Final Chance)^Hit Count
+ * 
+ * IMPORTANT: "Hit Count" for debuff/DoT application is NOT simply the number of
+ * hits in an attack. It must be manually configured per skill/effect, since many
+ * attacks only attempt to apply a debuff ONCE regardless of hit count (e.g. one
+ * attack's follow-up applies a DoT once at the end, not per hit), while other
+ * effects (e.g. certain light cones) do attempt on every hit. This should be a
+ * per-skill/per-effect configurable field, not auto-derived from hit count.
+ */
+struct EffectHitRateConfig {
+    double baseChance;           // Base chance as decimal (e.g., 0.30 for 30%)
+    double effectRES;            // Enemy's Effect RES as decimal (e.g., 0.20 for 20%)
+    double ehr;                  // Effect Hit Rate as decimal (e.g., 0.50 for 50%)
+    int hitCount;              // Manually specified per skill, NOT auto-derived
+    
+    EffectHitRateConfig()
+        : baseChance(0.0)
+        , effectRES(0.0)
+        , ehr(0.0)
+        , hitCount(1) {}
+};
+
+/**
+ * Stack type: Punchline (Elation) or Banger (Certified Banger).
+ * These are separate pools that never combine.
+ */
+enum class StackType {
+    Punchline,   // Elation's Punchline stack multiplier
+    Banger       // Certified Banger stack multiplier
+};
+
+/**
+ * Configuration for Punchline/Banger stack damage multiplier.
+ * 
+ * DMG Multiplier = 1 + [(Stacks x 5) / (Stacks + 240)]
+ * 
+ * Rules:
+ * - "Stacks" refers to either Elation's Punchline uses OR Certified Banger
+ *   stacks — these are two SEPARATE pools that never combine/add together.
+ * - No hard damage cap on this multiplier, but it has strong diminishing returns
+ *   as stacks grow (natural property of the formula).
+ * 
+ * Input: stackCount (non-negative integer), stackType (Punchline or Banger)
+ * Output: dmgMultiplier as decimal (e.g., 1.25 for 25% bonus)
+ */
+struct PunchlineBangerConfig {
+    int stackCount;            // Number of stacks (0 or positive)
+    StackType stackType;       // Punchline or Banger (mutually exclusive)
+    
+    PunchlineBangerConfig()
+        : stackCount(0)
+        , stackType(StackType::Punchline) {}
 };
 
 /**
@@ -211,14 +303,58 @@ double calculateResistanceMultiplier(const ResistanceMultiplierConfig& config);
 // Convenience overload with explicit base RES value
 double calculateResistanceMultiplier(
     double enemyBaseRES,  // Explicit base RES (e.g., 0.20 for 20%)
-    double resPenetration = 0.0
+    double resPenetration
 );
 
 // Convenience overload using resistance type
 double calculateResistanceMultiplier(
     EnemyResistanceType resistanceType,
-    double resPenetration = 0.0
+    double resPenetration
 );
+
+/**
+ * Calculates the Vulnerability multiplier.
+ * 
+ * Vuln Multiplier = 1 + Sum VULN%, capped at x3.5 (250% VULN max).
+ * The cap includes enemy self-vuln effects (e.g. Zandar's self-debuff)
+ * that stack together with player-sourced VULN toward the same 250% cap.
+ * 
+ * There is also a separate, uncapped "Special Enemy Vuln" multiplier
+ * applied only by Doomsday Beat and the story-only Sunday boss.
+ * 
+ * @param config The vulnerability configuration
+ * @return The calculated vulnerability multiplier as a decimal
+ */
+double calculateVulnerabilityMultiplier(const VulnerabilityConfig& config);
+
+// Convenience overload with sumVULN% and vuln type
+double calculateVulnerabilityMultiplier(double sumVULN, EnemyVulnerabilityType vulnType = EnemyVulnerabilityType::Standard, double specialVulnEnemy = 0.0);
+
+// Convenience overload with just sumVULN% (standard, capped)
+double calculateVulnerabilityMultiplier(double sumVULN);
+double calculateEffectHitRate(const EffectHitRateConfig& config);
+
+// Convenience overload with individual parameters
+double calculateEffectHitRate(double baseChance, double effectRES, double ehr, int hitCount = 1);
+
+// Multi-hit at-least-one chance calculation
+// At-Least-One Chance = 1 - (1 - Final Chance)^Hit Count
+double calculateEffectHitRateAtLeastOne(double finalChancePerHit, int hitCount);
+
+// Convenience overload using config
+double calculateEffectHitRateAtLeastOne(const EffectHitRateConfig& config);
+
+// Punchline/Banger stack damage multiplier
+// DMG Multiplier = 1 + [(Stacks x 5) / (Stacks + 240)]
+// Rules:
+// - StackType::Punchline: Elation's Punchline stacks
+// - StackType::Banger: Certified Banger stacks
+// - These are SEPARATE pools, never combined
+// - Strong diminishing returns as stacks grow (natural formula property)
+double calculatePunchlineBangerMultiplier(const PunchlineBangerConfig& config);
+
+// Convenience overload with individual parameters
+double calculatePunchlineBangerMultiplier(int stackCount, StackType stackType);
 
 // ============================================================================
 // SECTION 6: DMG TAKEN MULTIPLIER CALCULATION
@@ -402,7 +538,62 @@ double calculateTotalSpeed(const CoreStatConfig& config);
 double calculateTotalHP(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
 double calculateTotalATK(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
 double calculateTotalDEF(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
+// Convenience overloads with individual parameters
+double calculateTotalHP(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
+double calculateTotalATK(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
+double calculateTotalDEF(double characterBase, double lightConeBase, double percentBonus, double flatBonus);
 double calculateTotalSpeed(double characterBase, double percentBonus, double flatBonus);
+
+/**
+ * Calculates total speed with explicit Base Speed distinction.
+ * 
+ * Total Speed = Base Speed + (Base Speed × %Speed) + Flat Speed
+ * 
+ * Key rule: %Speed bonuses scale off BASE Speed only, NOT current/total Speed.
+ * This means two characters with different current Speed totals but the same
+ * Base Speed get an IDENTICAL Speed gain from the same %Speed buff.
+ * 
+ * Special case: Characters whose kit or Light Cone directly raises BASE Speed
+ * (e.g. Aglaea's Light Cone) get proportionally more value from %Speed buffs
+ * than characters who only add Speed via substats/boots (since substats/boots
+ * add to the %Speed or Flat Speed terms, not Base Speed).
+ * 
+ * @param characterBase The character's base speed (before any % or flat bonuses)
+ * @param percentBonus Speed% bonus as decimal (e.g., 0.10 for 10%)
+ * @param flatBonus Flat Speed bonus (from boots, substats, etc.)
+ * @return Total speed value
+ */
+double calculateSpeedWithBaseBonus(double characterBase, double percentBonus, double flatBonus);
+
+/**
+ * Calculates Action Advance - reduces the remaining AV requirement by a
+ * percentage of the remaining requirement (not a flat amount).
+ *
+ * Rules:
+ * - Advance is normally capped at 100% of the CURRENT remaining requirement
+ *   (cannot push a turn to before 0 AV).
+ * - EXCEPTION: if a character has previously been "delayed" such that they
+ *   need MORE than 100% action to take their next turn (e.g. 120% required),
+ *   the effective advance cap rises to match that higher requirement
+ *   (e.g. up to 120%). This needs a delayedActionRequirement field that
+ *   defaults to 100%.
+ * - Action Advance and Speed have an inverse value relationship: faster
+ *   characters have a smaller absolute AV pool remaining, so the same %
+ *   Action Advance yields a smaller absolute time savings for them. This means
+ *   Action Advance is worth MORE on slow characters and LESS on fast characters.
+ *
+ * Inputs: currentRemainingAVPercent (0.0 to delayedActionRequirement),
+ *         advancePercent (0.0 to 1.0, as decimal or percentage),
+ *         delayedActionRequirementPercent (defaults to 100.0, can be higher
+ *           if character was previously delayed)
+ * Output: newRemainingAVPercent (clamped such that it does not go below
+ *         delayedActionRequirementPercent - meaning the result cannot be
+ *         less than delayedActionRequirementPercent - currentRemainingAVPercent)
+ */
+double calculateActionAdvance(
+    double currentRemainingAVPercent,
+    double advancePercent,
+    double delayedActionRequirementPercent = 100.0);
 
 // ============================================================================
 // SECTION 1: MASTER DAMAGE FORMULA
@@ -423,6 +614,7 @@ struct MasterDamageConfig {
     DamageTakenConfig damageTakenConfig;
     UniversalDamageReductionConfig universalReductionConfig;
     WeakenessConfig weakenessConfig;
+    VulnerabilityConfig vulnerabilityConfig;
     
     MasterDamageConfig()
         : dmgPercentMultiplier(1.0) {}
@@ -436,6 +628,7 @@ struct DamageResult {
     double damageTakenMultiplier;
     double universalReductionMultiplier;
     double weakenessMultiplier;
+    double vulnerabilityMultiplier;
     double finalDamage;
     
     DamageResult()
@@ -446,6 +639,7 @@ struct DamageResult {
         , damageTakenMultiplier(1.0)
         , universalReductionMultiplier(1.0)
         , weakenessMultiplier(1.0)
+        , vulnerabilityMultiplier(1.0)
         , finalDamage(0.0) {}
 };
 

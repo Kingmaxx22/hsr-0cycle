@@ -1,4 +1,4 @@
-```
+
 # Build artifacts
 build/
 CMakeCache.txt
@@ -49,4 +49,16 @@ htmlcov/
 dist/
 *.tar.gz
 *.zip
-```
+
+# Large visual assets
+ui/assets/
+images/
+
+# Vendored source
+raylib/
+
+# Local backup copies
+build_backup/
+**/__pycache___backup/
+**/__pycache__/
+*.pyc

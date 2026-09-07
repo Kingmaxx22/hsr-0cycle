@@ -26,6 +26,30 @@ int SimulationEngine::calculateActionCost(int speed, const std::string& actionTy
     return baseAv;
 }
 
+double SimulationEngine::calculateTotalHp(const CharacterConfig& config) {
+    // HP Total = (Character Base HP + LC Base HP) x (1 + HP%) + Flat HP
+    double combinedBase = config.baseHp + config.lightConeBaseHp;
+    return combinedBase * (1.0 + config.hpPct) + config.flatHp;
+}
+
+double SimulationEngine::calculateTotalAtk(const CharacterConfig& config) {
+    // ATK Total = (Character Base ATK + LC Base ATK) x (1 + ATK%) + Flat ATK
+    double combinedBase = config.baseAtk + config.lightConeBaseAtk;
+    return combinedBase * (1.0 + config.atkPct) + config.flatAtk;
+}
+
+double SimulationEngine::calculateTotalDef(const CharacterConfig& config) {
+    // DEF Total = (Character Base DEF + LC Base DEF) x (1 + DEF%) + Flat DEF
+    double combinedBase = config.baseDef + config.lightConeBaseDef;
+    return combinedBase * (1.0 + config.defPct) + config.flatDef;
+}
+
+double SimulationEngine::calculateTotalSpeed(const CharacterConfig& config) {
+    // Speed Total = Character Base Speed x (1 + Speed%) + Flat Speed
+    // Note: Light Cones do not provide base Speed, so lightConeBase should be 0
+    return config.baseSpd * (1.0 + config.spdPct) + config.flatSpd;
+}
+
 void SimulationEngine::applyActionEffects(
     CharState& charState, 
     EnemyState& enemyState, 
@@ -238,6 +262,16 @@ SimulationResult SimulationEngine::runSimulation(
     for (const auto& state : charStates) {
         result.finalStats[state.config.id + "_sp"] = state.sp;
         result.finalStats[state.config.id + "_energy"] = static_cast<int>(state.energy);
+        
+        // Store calculated combat stats (from component build workflow)
+        result.finalStats[state.config.id + "_hp"] = static_cast<int>(
+            calculateTotalHp(state.config));
+        result.finalStats[state.config.id + "_atk"] = static_cast<int>(
+            calculateTotalAtk(state.config));
+        result.finalStats[state.config.id + "_def"] = static_cast<int>(
+            calculateTotalDef(state.config));
+        result.finalStats[state.config.id + "_spd"] = static_cast<int>(
+            calculateTotalSpeed(state.config));
     }
     
     return result;

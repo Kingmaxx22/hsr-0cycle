@@ -1,5 +1,6 @@
 #include "DamageCalculator.h"
 #include <algorithm>
+#include <cmath>
 
 namespace hsr {
 namespace damage {
@@ -18,7 +19,7 @@ double calculateBaseDamage(
     double scalingAttributeValue,
     double extraMultiplier,
     double extraDMG) {
-    
+
     return (skillMultiplier + extraMultiplier) * scalingAttributeValue + extraDMG;
 }
 
@@ -30,25 +31,25 @@ double calculateBaseDamage(
 double calculateDMGPercentMultiplier(const DMGPercentMultiplierConfig& config, bool includeDotDMG) {
     // Start with base 100% (1.0)
     double dmgPercentMult = 1.0;
-    
+
     // Add Elemental DMG%
     dmgPercentMult += config.elementalDMG;
-    
+
     // Add All-Type DMG%
     dmgPercentMult += config.allTypeDMG;
-    
+
     // Add DoT DMG% only if calculating DoT damage
     if (includeDotDMG) {
         dmgPercentMult += config.dotDMG;
     }
-    
+
     // Add active conditional buffs from otherDMG array
     for (const auto& buff : config.otherDMG) {
         if (buff.isActive) {
             dmgPercentMult += buff.dmgPercent;
         }
     }
-    
+
     return dmgPercentMult;
 }
 
@@ -58,13 +59,13 @@ double calculateDMGPercentMultiplier(
     double dotDMG,
     const std::vector<ConditionalDMGBuff>& otherDMG,
     bool includeDotDMG) {
-    
+
     DMGPercentMultiplierConfig config;
     config.elementalDMG = elementalDMG;
     config.allTypeDMG = allTypeDMG;
     config.dotDMG = dotDMG;
     config.otherDMG = otherDMG;
-    
+
     return calculateDMGPercentMultiplier(config, includeDotDMG);
 }
 
@@ -77,24 +78,32 @@ double calculateDMGPercentMultiplier(
 
 double calculateDefenseMultiplier(const DefenseMultiplierConfig& config) {
     int attackerLevel = std::max(1, config.attackerLevel);
-    
+
+    // Apply Plight difficulty override: forces enemy to use Level 100 DEF value
+    int effectiveLevel = config.isPlightDifficulty ? 100 : attackerLevel;
+
     // Calculate effective DEF
     // DEF = Base DEF x (100% + DEF% - (DEF Reduction + DEF Ignore)) + Flat DEF
     double defPercentTotal = 1.0 + config.enemyDEFPercent - (config.defReductionPercent + config.defIgnorePercent);
     double effectiveDEF = config.enemyBaseDEF * defPercentTotal + config.flatDEFReduction;
-    
+
+    // Apply Defense Shred: DEF_Value = Effective DEF x (1 - Shred%)
+    // Shred is capped at 100% (shredPercent clamped to 0-1)
+    double shred = std::clamp(config.shredPercent, 0.0, 1.0);
+    double defValue = effectiveDEF * (1.0 - shred);
+
     // Clamp DEF to 0 minimum
-    effectiveDEF = std::max(0.0, effectiveDEF);
-    
-    // Calculate DEF Mult = 100% - [DEF / (DEF + 200 + 10 x Attacker Level)]
-    double denominator = effectiveDEF + 200.0 + 10.0 * static_cast<double>(attackerLevel);
-    
+    defValue = std::max(0.0, defValue);
+
+    // Calculate DEF Mult = 100% - [DEF_Value / (DEF_Value + Attacker Level x 10 + 200)]
+    double denominator = defValue + 200.0 + 10.0 * static_cast<double>(effectiveLevel);
+
     if (denominator <= 0.0) {
         return 1.0;
     }
-    
-    double defMult = 1.0 - (effectiveDEF / denominator);
-    
+
+    double defMult = 1.0 - (defValue / denominator);
+
     return defMult;
 }
 
@@ -105,7 +114,7 @@ double calculateDefenseMultiplier(
     double defReductionPercent,
     double defIgnorePercent,
     double flatDEFReduction) {
-    
+
     DefenseMultiplierConfig config;
     config.attackerLevel = attackerLevel;
     config.enemyBaseDEF = enemyBaseDEF;
@@ -113,8 +122,52 @@ double calculateDefenseMultiplier(
     config.defReductionPercent = defReductionPercent;
     config.defIgnorePercent = defIgnorePercent;
     config.flatDEFReduction = flatDEFReduction;
-    
+
     return calculateDefenseMultiplier(config);
+}
+
+struct DefenseShredComparison {
+    double currentMultiplier;
+    double compareMultiplier;
+    double relativeGainPercent;
+};
+
+DefenseShredComparison calculateDefenseShredComparison(
+    double enemyTotalDEF,
+    double shredPercent,
+    double compareShredPercent,
+    int attackerLevel,
+    bool isPlightDifficulty) {
+
+    // Current calculation
+    int effectiveLevel = isPlightDifficulty ? 100 : attackerLevel;
+
+    double currentShred = std::clamp(shredPercent, 0.0, 1.0);
+    double currentDefValue = enemyTotalDEF * (1.0 - currentShred);
+    currentDefValue = std::max(0.0, currentDefValue);
+
+    double currentDenominator = currentDefValue + 200.0 + 10.0 * static_cast<double>(effectiveLevel);
+    double currentMult = 1.0;
+    if (currentDenominator > 0.0) {
+        currentMult = 1.0 - (currentDefValue / currentDenominator);
+    }
+
+    // Compare calculation
+    double compareShred = std::clamp(compareShredPercent, 0.0, 1.0);
+    double compareDefValue = enemyTotalDEF * (1.0 - compareShred);
+    compareDefValue = std::max(0.0, compareDefValue);
+
+    int compareLevel = isPlightDifficulty ? 100 : attackerLevel;
+    double compareDenominator = compareDefValue + 200.0 + 10.0 * static_cast<double>(compareLevel);
+    double compareMult = 1.0;
+    if (compareDenominator > 0.0) {
+        compareMult = 1.0 - (compareDefValue / compareDenominator);
+    }
+
+    // Relative gain = (finalMulti2 / finalMulti1) - 1
+    double relativeGain = (compareMult / currentMult) - 1.0;
+
+    return { currentMult, compareMult, relativeGain };
 }
 
 // ============================================================================
@@ -134,7 +187,7 @@ double calculateDefenseMultiplier(
 double calculateResistanceMultiplier(const ResistanceMultiplierConfig& config) {
     // Determine base RES based on resistance type
     double enemyBaseRES = 0.20; // Default Neutral = 20%
-    
+
     switch (config.resistanceType) {
         case EnemyResistanceType::Weak:
             enemyBaseRES = 0.0;   // Weak = 0%
@@ -147,16 +200,16 @@ double calculateResistanceMultiplier(const ResistanceMultiplierConfig& config) {
             enemyBaseRES = 0.20;  // Neutral = 20%
             break;
     }
-    
+
     // Clamp enemy RES between -100% and 90% before applying penetration
     double clampedRES = std::clamp(enemyBaseRES, -1.0, 0.9);
-    
+
     // Apply RES penetration
     double effectiveRES = clampedRES - std::clamp(config.resPenetration, 0.0, 1.0);
-    
+
     // Calculate RES Mult = 1 - Effective RES
     double resMult = 1.0 - effectiveRES;
-    
+
     // Clamp final multiplier to range [0.1, 2.0]
     return std::clamp(resMult, 0.1, 2.0);
 }
@@ -164,10 +217,10 @@ double calculateResistanceMultiplier(const ResistanceMultiplierConfig& config) {
 double calculateResistanceMultiplier(
     double enemyBaseRES,
     double resPenetration) {
-    
+
     ResistanceMultiplierConfig config;
     config.resPenetration = resPenetration;
-    
+
     // Set resistance type based on explicit base RES value
     if (enemyBaseRES <= 0.0) {
         config.resistanceType = EnemyResistanceType::Weak;
@@ -176,19 +229,48 @@ double calculateResistanceMultiplier(
     } else {
         config.resistanceType = EnemyResistanceType::Neutral;
     }
-    
+
     return calculateResistanceMultiplier(config);
 }
 
 double calculateResistanceMultiplier(
     EnemyResistanceType resistanceType,
     double resPenetration) {
-    
+
     ResistanceMultiplierConfig config;
     config.resistanceType = resistanceType;
     config.resPenetration = resPenetration;
-    
+
     return calculateResistanceMultiplier(config);
+}
+
+struct ResistancePenComparison {
+    double currentMultiplier;
+    double compareMultiplier;
+    double relativeGainPercent;
+};
+
+ResistancePenComparison calculateResistancePenetrationComparison(
+    double enemyRES,
+    double sumPEN,
+    double comparePEN) {
+
+    // Current calculation
+    double clampedRES = std::clamp(enemyRES, -1.0, 0.9);
+    double effectiveRES = clampedRES - std::clamp(sumPEN, 0.0, 1.0);
+    double currentMult = 1.0 - effectiveRES;
+    currentMult = std::clamp(currentMult, 0.1, 2.0);
+
+    // Compare calculation
+    double compareClampedRES = std::clamp(enemyRES, -1.0, 0.9);
+    double compareEffectiveRES = compareClampedRES - std::clamp(comparePEN, 0.0, 1.0);
+    double compareMult = 1.0 - compareEffectiveRES;
+    compareMult = std::clamp(compareMult, 0.1, 2.0);
+
+    // Relative gain = (finalMulti2 / finalMulti1) - 1
+    double relativeGain = (compareMult / currentMult) - 1.0;
+
+    return { currentMult, compareMult, relativeGain };
 }
 
 // ============================================================================
@@ -204,11 +286,11 @@ double calculateDamageTakenMultiplier(const DamageTakenConfig& config) {
 double calculateDamageTakenMultiplier(
     double elementalDMGTaken,
     double allTypeDMGTaken) {
-    
+
     DamageTakenConfig config;
     config.elementalDMGTaken = elementalDMGTaken;
     config.allTypeDMGTaken = allTypeDMGTaken;
-    
+
     return calculateDamageTakenMultiplier(config);
 }
 
@@ -225,32 +307,32 @@ double calculateDamageTakenMultiplier(
 double calculateUniversalDamageReductionMultiplier(const UniversalDamageReductionConfig& config) {
     // Start with base 100% (1.0)
     double universalReductionMult = 1.0;
-    
+
     // If enemy is not broken, apply built-in Toughness reduction (10%)
     if (!config.isEnemyBroken) {
         universalReductionMult *= 0.90;  // 100% - 10% = 90% = 0.90
     }
-    
+
     // Apply each reduction source multiplicatively
     for (double reduction : config.reductionSources) {
         // Clamp individual reduction to valid range [0, 1]
         double clampedReduction = std::clamp(reduction, 0.0, 1.0);
         universalReductionMult *= (1.0 - clampedReduction);
     }
-    
+
     return universalReductionMult;
 }
 
 double calculateUniversalDamageReductionMultiplier(
     double universalReduction,
     bool isEnemyBroken) {
-    
+
     UniversalDamageReductionConfig config;
     config.isEnemyBroken = isEnemyBroken;
     if (universalReduction > 0.0) {
         config.reductionSources.push_back(universalReduction);
     }
-    
+
     return calculateUniversalDamageReductionMultiplier(config);
 }
 
@@ -272,7 +354,7 @@ double calculateWeakenessMultiplier(const WeakenessConfig& config) {
 double calculateWeakenessMultiplier(double weakenessPercent) {
     WeakenessConfig config;
     config.weakenessPercent = weakenessPercent;
-    
+
     return calculateWeakenessMultiplier(config);
 }
 
@@ -349,48 +431,345 @@ double calculateTotalSpeed(double characterBase, double percentBonus, double fla
 }
 
 // ============================================================================
+// SECTION 15: PERCENTAGE SPEED CALCULATION
+// ============================================================================
+// Total Speed = Base Speed + (Base Speed x %Speed) + Flat Speed
+//
+// Rule: %Speed bonuses scale off BASE Speed only, NOT current/total Speed.
+// This means two characters with different current Speed totals but the same
+// Base Speed get an IDENTICAL flat Speed gain from the same %Speed buff.
+//
+// Special case: Characters whose kit or Light Cone directly raises BASE Speed
+// (e.g. Aglaea's Light Cone) get proportionally more value from %Speed buffs
+// than characters who only add Speed via substats/boots (since substats/boots
+// add to the %Speed or Flat Speed terms, not Base Speed).
+
+double calculateSpeedWithBaseBonus(double characterBase, double percentBonus, double flatBonus) {
+    // Total Speed = Base Speed + (Base Speed x %Speed) + Flat Speed
+    // %Speed is applied to characterBase (base speed) only
+    return characterBase * (1.0 + percentBonus) + flatBonus;
+}
+
+// ============================================================================
+// SECTION 16: SPEED BREAKPOINTS (INFORMATIONAL / WARNING LOGIC)
+// ============================================================================
+// Speed breakpoint warnings/disclaimers for UI display.
+//
+// Rules:
+// - Common cited breakpoints (134, 143, etc.) are only accurate within a SINGLE
+//   wave of combat.
+// - In multi-wave content (most MoC stages), the team gets re-sorted by Speed at
+//   the start of each new wave, resetting any Action Value lead — making most
+//   breakpoints inaccurate across wave transitions.
+// - 134 Speed is the one broadly reliable breakpoint (guarantees 2 actions in
+//   the first wave). Its main value is for players attempting to 0-cycle.
+// - Outside Pure Fiction (which has fixed, countable cycles), there is usually
+//   no meaningful hard threshold — higher Speed is just generally better without
+//   one specific target number.
+//
+// If implementing a "breakpoint calculator" UI feature, include this disclaimer
+// text near the output rather than presenting breakpoints as universally reliable.
+
+const char* getSpeedBreakpointDisclaimer() {
+    return R"(
+Speed Breakpoint Disclaimer:
+
+Commonly cited speed breakpoints (e.g., 134 speed = guaranteed two actions,
+143 speed, etc.) are ONLY accurate within a SINGLE wave of combat.
+
+In multi-wave content (most Memory of Chaos stages), the action order gets
+re-sorted by Speed at the start of each new wave, which resets any Action
+Value lead that may have built up. This means breakpoints that are accurate
+for wave 1 may be completely invalid for wave 2, 3, etc.
+
+134 Speed is the one broadly reliable breakpoint — it guarantees 2 actions
+in the first wave. Its primary value is for players attempting to 0-cycle
+(start combat with 0 Action Progress).
+
+Outside Pure Fiction (which has fixed, countable cycles), there is usually
+no meaningful hard threshold. Higher Speed is generally better without one
+specific target number.
+
+If you see speed breakpoint recommendations, treat them as approximate
+informational guides only, not guarantees — especially for multi-wave content.
+)";
+}
+
+double calculateVulnerabilityMultiplier(const VulnerabilityConfig& config) {
+    // Standard vulnerability: capped at 250% (3.5x), includes enemy self-vuln
+    if (config.vulnType == EnemyVulnerabilityType::Special) {
+        // Special enemy vuln: uncapped, 1 + specialVulnEnemy%
+        return 1.0 + config.specialVulnEnemy;
+    } else {
+        // Standard vuln: 1 + sumVULN, capped at 3.5 (250%)
+        double vulnMult = 1.0 + config.sumVULN;
+        return std::min(vulnMult, 3.5);
+    }
+}
+
+double calculateVulnerabilityMultiplier(double sumVULN, EnemyVulnerabilityType vulnType, double specialVulnEnemy) {
+    VulnerabilityConfig config;
+    config.sumVULN = sumVULN;
+    config.vulnType = vulnType;
+    config.specialVulnEnemy = specialVulnEnemy;
+
+    return calculateVulnerabilityMultiplier(config);
+}
+
+double calculateVulnerabilityMultiplier(double sumVULN) {
+    // Standard vuln with default type and no special enemy VULN
+    return calculateVulnerabilityMultiplier(sumVULN, EnemyVulnerabilityType::Standard, 0.0);
+}
+
+// ============================================================================
+// SECTION 13: EFFECT HIT RATE (EHR) / DEBUFF APPLICATION CHANCE
+// ============================================================================
+// Final Chance = Base Chance × (1 - Effect RES) × (1 + EHR)
+//
+// Rules:
+// - Final Chance is capped at 100%.
+// - Effect RES is capped at 100%.
+// - EHR itself has no upper cap.
+//
+// For MULTI-HIT attacks, use Bernoulli Trials to compute the chance of AT LEAST
+// ONE successful proc across all hits:
+//
+// At-Least-One Chance = 1 - (1 - Final Chance)^Hit Count
+//
+// IMPORTANT: "Hit Count" for debuff/DoT application must be manually configured
+// per skill/effect, NOT auto-derived from the attack's hit count.
+
+double calculateEffectHitRate(const EffectHitRateConfig& config) {
+    // Final Chance = Base Chance × (1 - Effect RES) × (1 + EHR)
+    double effectiveRES = std::clamp(config.effectRES, 0.0, 1.0);
+    double finalChance = config.baseChance * (1.0 - effectiveRES) * (1.0 + config.ehr);
+
+    // Cap at 100%
+    return std::min(finalChance, 1.0);
+}
+
+double calculateEffectHitRate(double baseChance, double effectRES, double ehr, int hitCount) {
+    EffectHitRateConfig config;
+    config.baseChance = baseChance;
+    config.effectRES = effectRES;
+    config.ehr = ehr;
+    config.hitCount = hitCount;
+
+    return calculateEffectHitRate(config);
+}
+
+double calculateEffectHitRateAtLeastOne(double finalChancePerHit, int hitCount) {
+    // At-Least-One Chance = 1 - (1 - Final Chance)^Hit Count
+    // If hitCount is 0 or negative, return 0
+    if (hitCount <= 0) {
+        return 0.0;
+    }
+
+    double result = 1.0 - std::pow(1.0 - finalChancePerHit, hitCount);
+
+    // Cap at 100%
+    return std::min(result, 1.0);
+}
+
+double calculateEffectHitRateAtLeastOne(const EffectHitRateConfig& config) {
+    return calculateEffectHitRateAtLeastOne(
+        calculateEffectHitRate(config),
+        config.hitCount
+    );
+}
+
+// ============================================================================
+// SECTION 14: PUNCHLINE / BANGER STACK MULTIPLIER
+// ============================================================================
+// DMG Multiplier = 1 + [(Stacks x 5) / (Stacks + 240)]
+//
+// Rules:
+// - StackType::Punchline: Elation's Punchline stacks
+// - StackType::Banger: Certified Banger stacks
+// - These are SEPARATE pools, never combined (summing would be incorrect)
+// - No hard cap, but strong diminishing returns as stacks grow (natural formula property)
+
+double calculatePunchlineBangerMultiplier(const PunchlineBangerConfig& config) {
+    // DMG Multiplier = 1 + [(Stacks x 5) / (Stacks + 240)]
+    double stacks = static_cast<double>(config.stackCount);
+
+    // Formula: 1 + (stacks * 5) / (stacks + 240)
+    // Note: If stacks is 0, result is 1 + 0/240 = 1.0 (no bonus)
+    double mult = 1.0 + (stacks * 5.0) / (stacks + 240.0);
+
+    return mult;
+}
+
+double calculatePunchlineBangerMultiplier(int stackCount, StackType stackType) {
+    PunchlineBangerConfig config;
+    config.stackCount = stackCount;
+    config.stackType = stackType;
+
+    return calculatePunchlineBangerMultiplier(config);
+}
+
+// ============================================================================
 // SECTION 1: MASTER DAMAGE FORMULA IMPLEMENTATION
 // ============================================================================
 // Outgoing DMG = Base DMG x DMG% Mult x DEF Mult x RES Mult x DMG Taken Mult
-//                x Universal DMG Reduction Mult x Weaken Mult
+//                x Universal DMG Reduction Mult x Weakeness Mult x Vulnerability Mult
 
 DamageResult calculateOutgoingDamage(const MasterDamageConfig& config) {
     DamageResult result;
-    
+
     // Calculate Base DMG (Section 2)
     result.baseDamage = calculateBaseDamage(config.baseDamageConfig);
-    
+
     // Store DMG% Multiplier
     result.dmgPercentMultiplier = config.dmgPercentMultiplier;
-    
+
     // Calculate DEF Multiplier (Section 4)
     result.defenseMultiplier = calculateDefenseMultiplier(config.defenseConfig);
-    
+
     // Calculate RES Multiplier (Section 5)
     result.resistanceMultiplier = calculateResistanceMultiplier(config.resistanceConfig);
-    
+
     // Calculate DMG Taken Multiplier (Section 6)
     result.damageTakenMultiplier = calculateDamageTakenMultiplier(config.damageTakenConfig);
-    
+
     // Calculate Universal DMG Reduction Multiplier (Section 7)
     result.universalReductionMultiplier = calculateUniversalDamageReductionMultiplier(
         config.universalReductionConfig);
-    
+
     // Calculate Weakeness Multiplier (Section 8)
     result.weakenessMultiplier = calculateWeakenessMultiplier(config.weakenessConfig);
-    
+
+    // Calculate Vulnerability Multiplier (Section 11)
+    result.vulnerabilityMultiplier = calculateVulnerabilityMultiplier(config.vulnerabilityConfig);
+
     // Apply master formula:
     // Outgoing DMG = Base DMG x DMG% Mult x DEF Mult x RES Mult x DMG Taken Mult
-    //                x Universal DMG Reduction Mult x Weakeness Mult
+    //                x Universal DMG Reduction Mult x Weakeness Mult x Vulnerability Mult
     result.finalDamage = result.baseDamage
                        * result.dmgPercentMultiplier
                        * result.defenseMultiplier
                        * result.resistanceMultiplier
                        * result.damageTakenMultiplier
                        * result.universalReductionMultiplier
-                       * result.weakenessMultiplier;
-    
+                       * result.weakenessMultiplier
+                       * result.vulnerabilityMultiplier;
+
     return result;
+}
+
+// ============================================================================
+// SECTION 17: ACTION ADVANCE
+// ============================================================================
+// Action Advance reduces the remaining AV requirement by a percentage of
+// the remaining requirement (not a flat amount).
+//
+// Rules:
+// - Advance is normally capped at 100% of the CURRENT remaining requirement
+//   (cannot push a turn to before 0 AV).
+// - EXCEPTION: if a character has previously been "delayed" such that they
+//   need MORE than 100% action to take their next turn (e.g. 120% required),
+//   the effective advance cap rises to match that higher requirement (e.g. up
+//   to 120%). This needs a delayedActionRequirement field that defaults to 100%.
+// - Action Advance and Speed have an inverse value relationship: faster
+//   characters have a smaller absolute AV pool remaining, so the same % Action
+//   Advance yields a smaller absolute time savings for them. This means Action
+//   Advance is worth MORE on slow characters and LESS on fast characters.
+//
+// Inputs: currentRemainingAVPercent (0.0 to delayedActionRequirement),
+//         advancePercent (0.0 to 1.0, as decimal or percentage),
+//         delayedActionRequirementPercent (defaults to 100.0, can be higher
+//           if character was previously delayed)
+// Output: newRemainingAVPercent (clamped such that it does not go below
+//         delayedActionRequirementPercent - meaning the result cannot be
+//         less than delayedActionRequirementPercent - currentRemainingAVPercent)
+double calculateActionAdvance(
+    double currentRemainingAVPercent,
+    double advancePercent,
+    double delayedActionRequirementPercent) {
+
+    // Clamp advancePercent to valid range [0, 1]
+    double advance = std::clamp(advancePercent, 0.0, 1.0);
+
+    // Calculate remaining AV after advance
+    // Advance clears 'advancePercent' of the REMAINING requirement
+    double remainingAfterAdvance = currentRemainingAVPercent * (1.0 - advance);
+
+    // The result cannot go below the delayedActionRequirement ceiling.
+    // If delayedActionRequirementPercent <= 100.0, no special floor (normal behavior):
+    if (delayedActionRequirementPercent <= 100.0) {
+        // Normal case: just return the calculated remaining, but ensure it's not negative
+        return std::max(0.0, remainingAfterAdvance);
+    }
+
+    // Delayed case: delayedActionRequirementPercent > 100.0
+    // The character needs more than 100% AV. The floor is elevated:
+    // If the requirement is 120%, at least 20% of the "extra" remains.
+    // Clamp remainingAfterAdvance to not go below (delayed - 100).
+    double floorValue = delayedActionRequirementPercent - 100.0;
+    return std::max(remainingAfterAdvance, floorValue);
+}
+
+// ============================================================================
+// SECTION 18: MID-TURN SPEED CHANGES
+// ============================================================================
+// When a character's Speed changes during an action, do not recalculate the
+// entire action from zero. Account for action progress already spent.
+//
+// Conceptually:
+//
+// Raw AV at old Speed
+// ↓
+// AV already spent
+// ↓
+// Action progress
+// ↓
+// Apply advance if applicable
+// ↓
+// New Speed
+// ↓
+// Remaining AV using new Speed
+//
+// Formula:
+//
+// Raw AV at old Speed = 10000 / Old Speed
+// % Action Taken = (AV already spent / Raw AV at old Speed) × 100 + Action Advance % already applied
+// Remaining AV at new Speed = (1 - % Action Taken / 100) × (10000 / New Speed)
+// Total AV for the turn = AV already spent + Remaining AV at new Speed
+//
+// Worked example:
+//   oldSpeed = 102, avSpent = 45, actionAdvancePercent = 24, newSpeed = 137
+//   Raw AV at old Speed = 10000 / 102 = ~98.04
+//   % Action Taken = (45 / 98.04 × 100) + 24 = ~69.9%
+//   Remaining AV at new Speed = (1 - 0.699) × (10000 / 137) = ~21.97
+//   Total AV for the turn = 45 + 21.97 = ~66.97
+//
+
+double calculateMidTurnSpeedChange(
+    double oldSpeed,
+    double avAlreadySpent,
+    double actionAdvancePercentAlreadyApplied,
+    double newSpeed)
+{
+    // Raw AV at old Speed = 10000 / Old Speed
+    double rawAVOldSpeed = 10000.0 / oldSpeed;
+
+    // % Action Taken =
+    // (AV already spent / Raw AV at old Speed) × 100
+    // + Action Advance % already applied
+    double percentActionTaken =
+        (avAlreadySpent / rawAVOldSpeed) * 100.0
+        + actionAdvancePercentAlreadyApplied;
+
+    // Remaining AV at new Speed
+    double remainingAVNewSpeed =
+        (1.0 - (percentActionTaken / 100.0))
+        * (10000.0 / newSpeed);
+
+    // Total AV for the turn
+    double totalAVForTurn =
+        avAlreadySpent + remainingAVNewSpeed;
+
+    return totalAVForTurn;
 }
 
 } // namespace damage
