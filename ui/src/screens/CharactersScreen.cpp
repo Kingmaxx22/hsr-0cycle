@@ -64,36 +64,80 @@ Rectangle CharactersScreen::manualFieldBounds(int index) const
 
 Rectangle CharactersScreen::extraFieldBounds(int index) const
 {
-    // Other bonuses: 3 cols x 3 rows at right; base override: 4-in-a-row.
-    if (index < 9)
+    // Other bonuses: 5 cols x 2 rows at right; base override: 4-in-a-row.
+    if (index < 10)
     {
-        int col = index % 3;
-        int row = index / 3;
-        return Rectangle{720.0f + col * 210.0f, 594.0f + row * 44.0f, 190.0f, 28.0f};
+        int col = index % 5;
+        int row = index / 5;
+        return Rectangle{720.0f + col * 132.0f, 554.0f + row * 44.0f, 120.0f, 28.0f};
     }
-    int col = index - 9;
-    return Rectangle{720.0f + col * 160.0f, 755.0f, 140.0f, 28.0f};
+    int col = index - 10;
+    return Rectangle{720.0f + col * 160.0f, 720.0f, 140.0f, 28.0f};
 }
 
 Rectangle CharactersScreen::baseToggleBounds() const
 {
-    return Rectangle{720.0f, 712.0f, 240.0f, 28.0f};
+    return Rectangle{720.0f, 672.0f, 240.0f, 28.0f};
 }
 
 Rectangle CharactersScreen::levelMinusBounds() const
 {
-    return Rectangle{1020.0f, 712.0f, 30.0f, 28.0f};
+    return Rectangle{1020.0f, 672.0f, 30.0f, 28.0f};
 }
 
 Rectangle CharactersScreen::levelPlusBounds() const
 {
-    return Rectangle{1100.0f, 712.0f, 30.0f, 28.0f};
+    return Rectangle{1100.0f, 672.0f, 30.0f, 28.0f};
+}
+
+Rectangle CharactersScreen::toggleRowBounds(int index) const
+{
+    return Rectangle{310.0f, 780.0f + index * 24.0f, 390.0f, 22.0f};
+}
+
+std::vector<CharactersScreen::CondToggle> CharactersScreen::conditionalToggles(
+    const CharacterLoadout& lo) const
+{
+    // Equipped conditional effects in stable order: A-2pc, A-4pc (when
+    // 4pc mode), B-2pc (when 2+2 mode), planar-2pc.
+    std::vector<CondToggle> out;
+    const CharacterInfo* ci = selectedInfo();
+    const std::string attackerElement = (ci != nullptr) ? ci->element : "";
+    auto collect = [&](const std::string& setId, bool allowFourPiece, bool isPlanar) {
+        if (setId.empty())
+            return;
+        const RelicSetInfo* set = m_relicSets.get(setId);
+        if (set == nullptr)
+            return;
+        auto collectList = [&](const std::vector<SetEffect>& list, const std::string& piece) {
+            for (size_t i = 0; i < list.size(); ++i)
+            {
+                if (!list[i].hasCondition)
+                    continue;
+                std::string valueText = formatStatValueText(
+                    list[i].value * 100.0, "atk_pct") + "%";
+                std::string label = set->name + " " + piece + "pc: +" +
+                    valueText + " " + list[i].stat;
+                bool autoOn = loadout::isSetEffectAutoActive(
+                    list[i].condition, attackerElement);
+                out.push_back({loadout::setEffectId(setId, piece, i), label, autoOn});
+            }
+        };
+        collectList(set->twoPiece, "2");
+        if (allowFourPiece && !isPlanar)
+            collectList(set->fourPiece, "4");
+    };
+    collect(lo.relicSetA, lo.relicFourPiece, false);
+    if (!lo.relicFourPiece)
+        collect(lo.relicSetB, false, false);
+    collect(lo.planarSet, false, true);
+    return out;
 }
 
 bool CharactersScreen::extraFieldIsPercent(int index) const
 {
-    // Index 3 is flat SPD; 9-12 are flat base stats; rest are percent-numbers.
-    if (index == 3 || index >= 9)
+    // Index 3 is flat SPD; 10-13 are flat base stats; rest percent-numbers.
+    if (index == 3 || index >= 10)
         return false;
     return true;
 }
@@ -130,16 +174,18 @@ void CharactersScreen::syncExtraTexts()
     if (info == nullptr)
         return;
     const CharacterLoadout& lo = loadoutFor(info->id);
-    const double pct[9] = {
+    const double pct[10] = {
         lo.otherBonuses.atkPct, lo.otherBonuses.hpPct, lo.otherBonuses.defPct,
         lo.otherBonuses.flatSpd, lo.otherBonuses.critRate, lo.otherBonuses.critDmg,
-        lo.otherBonuses.elemDmgPct, lo.otherBonuses.resPen, lo.otherBonuses.ehr
+        lo.otherBonuses.elemDmgPct, lo.otherBonuses.resPen, lo.otherBonuses.ehr,
+        lo.otherBonuses.breakDmgIncrease
     };
-    const char* pctKeys[9] = {
+    const char* pctKeys[10] = {
         "atk_pct", "hp_pct", "def_pct", "spd", "crit_rate_pct",
-        "crit_dmg_pct", "atk_pct", "atk_pct", "effect_hit_rate_pct"
+        "crit_dmg_pct", "atk_pct", "atk_pct", "effect_hit_rate_pct",
+        "break_effect_pct"
     };
-    for (int i = 0; i < 9; ++i)
+    for (int i = 0; i < 10; ++i)
     {
         if (i == m_focusedExtraField)
             continue;
@@ -151,7 +197,7 @@ void CharactersScreen::syncExtraTexts()
     };
     for (int i = 0; i < 4; ++i)
     {
-        int idx = 9 + i;
+        int idx = 10 + i;
         if (idx == m_focusedExtraField)
             continue;
         m_extraTexts[static_cast<size_t>(idx)] = formatStatValueText(base[i], "hp");
@@ -180,10 +226,11 @@ void CharactersScreen::commitExtraField(int index)
         case 6: lo.otherBonuses.elemDmgPct = value; break;
         case 7: lo.otherBonuses.resPen = value; break;
         case 8: lo.otherBonuses.ehr = value; break;
-        case 9: lo.manualBase.hp = value; break;
-        case 10: lo.manualBase.atk = value; break;
-        case 11: lo.manualBase.def = value; break;
-        case 12: lo.manualBase.spd = value; break;
+        case 9: lo.otherBonuses.breakDmgIncrease = value; break;
+        case 10: lo.manualBase.hp = value; break;
+        case 11: lo.manualBase.atk = value; break;
+        case 12: lo.manualBase.def = value; break;
+        case 13: lo.manualBase.spd = value; break;
         default: break;
     }
 }
@@ -318,7 +365,7 @@ void CharactersScreen::update(float dt)
             for (int i = 0; i < kExtraFieldCount; ++i)
             {
                 // Base fields are inert unless the override is enabled.
-                if (i >= 9 && !lo.manualBase.useOverride)
+                if (i >= 10 && !lo.manualBase.useOverride)
                     continue;
                 if (CheckCollisionPointRec(mouse, extraFieldBounds(i)))
                 {
@@ -361,6 +408,26 @@ void CharactersScreen::update(float dt)
                 else if (CheckCollisionPointRec(mouse, levelPlusBounds()))
                 {
                     lo.level = std::min(90, lo.level + 1);
+                }
+                else
+                {
+                    // Q3 conditional set-effect opt-in toggles (max 3 drawn).
+                    auto toggles = conditionalToggles(lo);
+                    size_t shown = std::min(toggles.size(), static_cast<size_t>(3));
+                    for (size_t ti = 0; ti < shown; ++ti)
+                    {
+                        if (CheckCollisionPointRec(mouse, toggleRowBounds(static_cast<int>(ti))))
+                        {
+                            // Auto-derived effects need no click; manual ones
+                            // flip the opt-in (inserting false = stays OFF).
+                            if (!toggles[ti].autoActive)
+                            {
+                                bool& active = lo.setEffectActive[toggles[ti].effectId];
+                                active = !active;
+                            }
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -634,7 +701,7 @@ void CharactersScreen::draw()
         const CharacterInfo* ci = selectedInfo();
         if (ci != nullptr) {
             CharacterLoadout& lo = loadoutFor(ci->id);
-            loadout::ResolvedTotals totals = loadout::resolveTotals(*ci, lo, m_lightCones);
+            loadout::ResolvedTotals totals = loadout::resolveTotals(*ci, lo, m_lightCones, m_relicSets);
 
             int yPos = static_cast<int>(modeContentY + 55);
             DrawText(("Final HP:  " + std::to_string(static_cast<int>(totals.hp))).c_str(), 310, yPos, 15, WHITE);
@@ -662,17 +729,49 @@ void CharactersScreen::draw()
             yPos += 22;
             DrawText("Edit gear in RELICS, Light Cone in LIGHT CONES.", 310, yPos, 13, GRAY);
 
+            // Q3 conditional set-effect opt-ins (manual-only, default OFF).
+            auto toggles = conditionalToggles(lo);
+            if (!toggles.empty())
+            {
+                DrawText("CONDITIONAL SET FX — opt-in, default OFF", 310, 760, 13, YELLOW);
+                size_t shown = std::min(toggles.size(), static_cast<size_t>(3));
+                for (size_t ti = 0; ti < shown; ++ti)
+                {
+                    Rectangle row = toggleRowBounds(static_cast<int>(ti));
+                    auto it = lo.setEffectActive.find(toggles[ti].effectId);
+                    bool manual = (it != lo.setEffectActive.end() && it->second);
+                    bool on = manual || toggles[ti].autoActive;
+                    DrawRectangle(static_cast<int>(row.x), static_cast<int>(row.y + 3),
+                                  14, 14, on ? GREEN : DARKGRAY);
+                    if (on)
+                        DrawText("x", static_cast<int>(row.x + 3),
+                                 static_cast<int>(row.y + 2), 14, BLACK);
+                    std::string label = toggles[ti].label;
+                    if (toggles[ti].autoActive)
+                        label += " [AUTO]";
+                    if (label.size() > 52)
+                        label = label.substr(0, 49) + "...";
+                    DrawText(label.c_str(), static_cast<int>(row.x + 22),
+                             static_cast<int>(row.y + 3), 13, on ? RAYWHITE : LIGHTGRAY);
+                }
+                if (toggles.size() > shown)
+                {
+                    std::string more = "+" + std::to_string(toggles.size() - shown) + " more";
+                    DrawText(more.c_str(), 310, 780 + static_cast<int>(shown) * 24, 12, GRAY);
+                }
+            }
+
             // --- Right column: other bonuses / base override / level ---
             DrawText("OTHER BONUSES", 720, static_cast<int>(modeContentY), 15, Color{180, 185, 198, 255});
             const char* extraNames[kExtraFieldCount] = {
-                "ATK%", "HP%", "DEF%", "SPD",
-                "CRIT%", "CRIT DMG%", "DMG%", "RES PEN%", "EHR%",
+                "ATK%", "HP%", "DEF%", "SPD", "CRIT%",
+                "CRIT DMG%", "DMG%", "RES PEN%", "EHR%", "BRK DMG+%",
                 "Base HP", "Base ATK", "Base DEF", "Base SPD"
             };
             for (int i = 0; i < kExtraFieldCount; ++i)
             {
                 // Base fields live in their own row below; skip them here.
-                if (i >= 9)
+                if (i >= 10)
                     continue;
                 Rectangle field = extraFieldBounds(i);
                 const bool focused = (m_focusedExtraField == i);
@@ -701,18 +800,18 @@ void CharactersScreen::draw()
             DrawText(toggleLabel.c_str(), static_cast<int>(toggle.x + 12),
                      static_cast<int>(toggle.y + 7), 13, RAYWHITE);
 
-            DrawText("Lv", 990, 719, 14, WHITE);
+            DrawText("Lv", 990, 679, 14, WHITE);
             Rectangle minusR = levelMinusBounds();
             Rectangle plusR = levelPlusBounds();
             DrawRectangleRounded(minusR, 0.2f, 6, Color{28, 31, 41, 255});
             DrawRectangleRoundedLines(minusR, 0.2f, 6, Color{55, 59, 72, 255});
             DrawText("-", static_cast<int>(minusR.x + 11), static_cast<int>(minusR.y + 5), 15, RAYWHITE);
-            DrawText(std::to_string(lo.level).c_str(), 1058, 719, 14, RAYWHITE);
+            DrawText(std::to_string(lo.level).c_str(), 1058, 679, 14, RAYWHITE);
             DrawRectangleRounded(plusR, 0.2f, 6, Color{28, 31, 41, 255});
             DrawRectangleRoundedLines(plusR, 0.2f, 6, Color{55, 59, 72, 255});
             DrawText("+", static_cast<int>(plusR.x + 10), static_cast<int>(plusR.y + 5), 15, RAYWHITE);
 
-            for (int i = 9; i < kExtraFieldCount; ++i)
+            for (int i = 10; i < kExtraFieldCount; ++i)
             {
                 Rectangle field = extraFieldBounds(i);
                 const bool focused = (m_focusedExtraField == i);
@@ -733,8 +832,8 @@ void CharactersScreen::draw()
                          static_cast<int>(field.y + 6), 14,
                          (!enabled || m_extraTexts[static_cast<size_t>(i)].empty()) && !focused ? GRAY : RAYWHITE);
             }
-            DrawText("% fields take percent-numbers (15 = 15%). Set bonuses: no data, not applied.",
-                     720, 812, 12, GRAY);
+            DrawText("% fields take percent-numbers (15 = 15%).",
+                     720, 772, 12, GRAY);
         }
 
         // Instruction

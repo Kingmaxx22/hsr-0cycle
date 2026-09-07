@@ -95,6 +95,7 @@ static hsr::CharacterConfig BuildSimCharacter(
     const CharacterInfo& info,
     CharacterLoadout& loadout,
     const LightConeDatabase& lightCones,
+    const RelicSetDatabase& relicSets,
     const CharactersScreen* charactersScreen)
 {
     hsr::CharacterConfig config;
@@ -112,6 +113,7 @@ static hsr::CharacterConfig BuildSimCharacter(
                 manual.critRate, manual.critDmg, manual.elemDmg,
                 manual.resPen, manual.ehr, manual.effectRes);
             config.level = loadout.level;
+            config.element = info.element;
             config.rotation = {"Skill", "Basic", "Basic"};
             // Skill multipliers below are documented fallbacks, not data.
             config.scalingStat = "atk";
@@ -124,7 +126,8 @@ static hsr::CharacterConfig BuildSimCharacter(
     }
 
     ensureLoadoutDefaults(loadout);
-    loadout::applyToCharacterConfig(config, info, loadout, lightCones);
+    loadout::applyToCharacterConfig(config, info, loadout, lightCones, relicSets);
+    config.element = info.element;
     config.rotation = {"Skill", "Basic", "Basic"};
     // Skill multipliers below are documented fallbacks, not data.
     config.scalingStat = "atk";
@@ -135,13 +138,49 @@ static hsr::CharacterConfig BuildSimCharacter(
     return config;
 }
 
+// Section 22.9: slots (id + spawn clock) resolve to full engine configs
+// here — the enemy DB stays the single source of truth for stats.
+static hsr::EncounterConfig BuildEncounter(
+    const std::array<std::vector<SlotEntry>, EnemiesScreen::kSlotCount>& slots,
+    const EnemyDatabase& enemies)
+{
+    hsr::EncounterConfig encounter;
+    for (size_t s = 0; s < slots.size(); ++s)
+    {
+        for (const auto& entry : slots[s])
+        {
+            const EnemyInfo* info = enemies.get(entry.id);
+            if (info == nullptr)
+                continue;
+            hsr::EnemyConfig config;
+            config.id = info->id;
+            config.name = info->name;
+            config.maxHp = static_cast<int>(info->hp);
+            config.currentHp = static_cast<int>(info->hp);
+            config.toughness = static_cast<int>(info->toughness);
+            config.level = info->level;
+            config.baseDef = info->def;
+            config.atk = info->atk;
+            config.spd = info->spd > 0.0 ? info->spd : 100.0;
+            config.res = std::map<std::string, double>(
+                info->resistances.begin(), info->resistances.end());
+            config.weaknesses = info->weaknesses;
+            config.slotIndex = static_cast<int>(s);
+            config.spawnAv = entry.spawnAv;
+            // Per-entry RES override wins over the Q2 auto-rule; negative
+            // keeps auto (weakness-first, then map, else 20%).
+            if (entry.resOverride >= 0.0)
+                config.baseResOverride = entry.resOverride / 100.0;
+            encounter.slots[s].push_back(config);
+        }
+    }
+    return encounter;
+}
+
 void App::goToSimulationScreen(int navIndex)
 {
-    // Pass selected enemy from EnemiesScreen if available
-    std::string selectedEnemy = enemiesScreen->getSelectedEnemyId();
-    if (!selectedEnemy.empty()) {
-        simulationScreen->setSelectedEnemy(selectedEnemy);
-    }
+    // Pass the configured 5-slot encounter (empty slots are valid).
+    simulationScreen->setEncounter(BuildEncounter(enemiesScreen->getSlots(), enemies));
     // Section 21.7: push the configured team straight into the engine.
     bool hasTeam = false;
     for (const auto& id : teamBuilder->getTeam()) {
@@ -158,7 +197,7 @@ void App::goToSimulationScreen(int navIndex)
             const CharacterInfo* info = characters.get(id);
             if (info != nullptr)
                 simulationScreen->addCharacter(
-                    BuildSimCharacter(*info, loadouts[id], lightCones,
+                    BuildSimCharacter(*info, loadouts[id], lightCones, relicSets,
                                       charactersScreen.get()));
         }
     }

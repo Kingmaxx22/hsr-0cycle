@@ -138,10 +138,128 @@ Rectangle EnemiesScreen::rowBounds(int row)
 {
     return Rectangle{
         310.0f,
-        168.0f + row * 66.0f,
+        200.0f + row * 66.0f,
         800.0f,
         56.0f
     };
+}
+
+Rectangle EnemiesScreen::slotTabBounds(int slot)
+{
+    return Rectangle{
+        310.0f + slot * 130.0f,
+        140.0f,
+        122.0f,
+        26.0f
+    };
+}
+
+// Slot-content rows live at the bottom of the right detail panel.
+Rectangle EnemiesScreen::slotEntryBounds(int entryRow) const
+{
+    return Rectangle{1142.0f, 666.0f + entryRow * 26.0f, 256.0f, 24.0f};
+}
+
+Rectangle EnemiesScreen::slotEntryRemoveBounds(int entryRow) const
+{
+    Rectangle r = slotEntryBounds(entryRow);
+    return Rectangle{r.x + r.width - 24.0f, r.y + 2.0f, 20.0f, 20.0f};
+}
+
+Rectangle EnemiesScreen::slotEntrySpawnMinusBounds(int entryRow) const
+{
+    Rectangle r = slotEntryBounds(entryRow);
+    return Rectangle{r.x + 92.0f, r.y + 2.0f, 20.0f, 20.0f};
+}
+
+Rectangle EnemiesScreen::slotEntrySpawnPlusBounds(int entryRow) const
+{
+    Rectangle r = slotEntryBounds(entryRow);
+    return Rectangle{r.x + 152.0f, r.y + 2.0f, 20.0f, 20.0f};
+}
+
+Rectangle EnemiesScreen::slotEntryResBounds(int entryRow) const
+{
+    Rectangle r = slotEntryBounds(entryRow);
+    return Rectangle{r.x + 176.0f, r.y + 2.0f, 58.0f, 20.0f};
+}
+
+Rectangle EnemiesScreen::slotClearBounds() const
+{
+    return Rectangle{1142.0f, 828.0f, 120.0f, 26.0f};
+}
+
+void EnemiesScreen::drawSlotContents()
+{
+    const auto& slot = slots[static_cast<size_t>(activeSlot)];
+
+    std::string header = "SLOT " + std::to_string(activeSlot + 1) +
+        " (" + std::to_string(slot.size()) + ")";
+    DrawText(header.c_str(), 1150, 642, 14, RAYWHITE);
+
+    size_t shown = std::min(slot.size(), static_cast<size_t>(6));
+    for (size_t e = 0; e < shown; ++e)
+    {
+        int row = static_cast<int>(e);
+        Rectangle r = slotEntryBounds(row);
+        const EnemyInfo* info = enemies.get(slot[e].id);
+
+        DrawRectangleRounded(r, 0.12f, 6, kPanelBg);
+        DrawRectangleRoundedLines(r, 0.12f, 6, kPanelBorder);
+
+        std::string name = info != nullptr ? info->name : slot[e].id;
+        if (name.size() > 13)
+            name = name.substr(0, 12) + ".";
+        DrawText(name.c_str(), static_cast<int>(r.x + 6),
+                 static_cast<int>(r.y + 5), 12, RAYWHITE);
+
+        // Spawn clock (0 = present from the start).
+        std::string av = (slot[e].spawnAv <= 0) ? "0"
+                         : std::to_string(slot[e].spawnAv);
+        DrawText(av.c_str(), static_cast<int>(r.x + 114),
+                 static_cast<int>(r.y + 5), 11, kDimText);
+
+        Rectangle minusR = slotEntrySpawnMinusBounds(row);
+        Rectangle plusR = slotEntrySpawnPlusBounds(row);
+        Rectangle resR = slotEntryResBounds(row);
+        Rectangle xR = slotEntryRemoveBounds(row);
+        DrawRectangleRounded(minusR, 0.2f, 4, kPanelBg);
+        DrawRectangleRoundedLines(minusR, 0.2f, 4, kPanelBorder);
+        DrawText("-", static_cast<int>(minusR.x + 7),
+                 static_cast<int>(minusR.y + 2), 12, RAYWHITE);
+        DrawRectangleRounded(plusR, 0.2f, 4, kPanelBg);
+        DrawRectangleRoundedLines(plusR, 0.2f, 4, kPanelBorder);
+        DrawText("+", static_cast<int>(plusR.x + 6),
+                 static_cast<int>(plusR.y + 2), 12, RAYWHITE);
+        // Per-entry RES override: auto-rule unless cycled otherwise.
+        std::string resLabel = "R:auto";
+        if (slot[e].resOverride >= 0.0)
+            resLabel = "R:" + std::to_string(static_cast<int>(slot[e].resOverride));
+        DrawRectangleRounded(resR, 0.2f, 4, kPanelBg);
+        DrawRectangleRoundedLines(resR, 0.2f, 4, kPanelBorder);
+        DrawText(resLabel.c_str(), static_cast<int>(resR.x + 5),
+                 static_cast<int>(resR.y + 3), 11,
+                 slot[e].resOverride >= 0.0 ? RAYWHITE : kDimText);
+        DrawRectangleRounded(xR, 0.2f, 4, Color{90, 30, 30, 255});
+        DrawText("x", static_cast<int>(xR.x + 6),
+                 static_cast<int>(xR.y + 2), 12, RAYWHITE);
+    }
+    if (slot.size() > shown)
+    {
+        std::string more = "+" + std::to_string(slot.size() - shown) + " more";
+        DrawText(more.c_str(), 1150,
+                 static_cast<int>(slotEntryBounds(static_cast<int>(shown)).y + 4),
+                 12, kDimText);
+    }
+
+    if (!slot.empty())
+    {
+        Rectangle clearR = slotClearBounds();
+        DrawRectangleRounded(clearR, 0.14f, 6, kPanelBg);
+        DrawRectangleRoundedLines(clearR, 0.14f, 6, kPanelBorder);
+        DrawText("Clear slot", static_cast<int>(clearR.x + 12),
+                 static_cast<int>(clearR.y + 6), 13, kDimText);
+    }
 }
 
 void EnemiesScreen::rebuildFiltered()
@@ -197,9 +315,20 @@ void EnemiesScreen::rebuildFiltered()
         std::clamp(scrollOffset, 0, maxScroll);
 }
 
-void EnemiesScreen::selectEnemy(const EnemyInfo& enemy)
+void EnemiesScreen::toggleSlotEntry(const EnemyInfo& enemy)
 {
-    selectedEnemyId = enemy.id;
+    // Click toggles the id in the ACTIVE slot (dedupe within a slot;
+    // the same id may still appear in other slots).
+    auto& slot = slots[static_cast<size_t>(activeSlot)];
+    for (auto it = slot.begin(); it != slot.end(); ++it)
+    {
+        if (it->id == enemy.id)
+        {
+            slot.erase(it);
+            return;
+        }
+    }
+    slot.push_back(SlotEntry{enemy.id, 0});
 }
 
 bool EnemiesScreen::consumeBackRequest()
@@ -251,12 +380,69 @@ void EnemiesScreen::update(float dt)
         }
     }
 
+    // Slot tabs + slot-content controls (detail panel).
+    if (pressed)
+    {
+        for (int s = 0; s < kSlotCount; ++s)
+        {
+            if (CheckCollisionPointRec(mouse, slotTabBounds(s)))
+            {
+                activeSlot = s;
+                return;
+            }
+        }
+
+        const auto& slot = slots[static_cast<size_t>(activeSlot)];
+        size_t shown = std::min(slot.size(), static_cast<size_t>(7));
+        for (size_t e = 0; e < shown; ++e)
+        {
+            int row = static_cast<int>(e);
+            if (CheckCollisionPointRec(mouse, slotEntryRemoveBounds(row)))
+            {
+                slots[static_cast<size_t>(activeSlot)].erase(
+                    slots[static_cast<size_t>(activeSlot)].begin() + row);
+                return;
+            }
+            if (CheckCollisionPointRec(mouse, slotEntrySpawnMinusBounds(row)))
+            {
+                SlotEntry& entry = slots[static_cast<size_t>(activeSlot)][static_cast<size_t>(row)];
+                entry.spawnAv = std::max(0, entry.spawnAv - 500);
+                return;
+            }
+            if (CheckCollisionPointRec(mouse, slotEntrySpawnPlusBounds(row)))
+            {
+                SlotEntry& entry = slots[static_cast<size_t>(activeSlot)][static_cast<size_t>(row)];
+                entry.spawnAv = std::min(15000, entry.spawnAv + 500);
+                return;
+            }
+            if (CheckCollisionPointRec(mouse, slotEntryResBounds(row)))
+            {
+                // Cycle auto -> 0 -> 20 -> 40 -> auto (percent-points).
+                SlotEntry& entry = slots[static_cast<size_t>(activeSlot)][static_cast<size_t>(row)];
+                if (entry.resOverride < 0.0)
+                    entry.resOverride = 0.0;
+                else if (entry.resOverride < 0.5)
+                    entry.resOverride = 20.0;
+                else if (entry.resOverride < 20.5)
+                    entry.resOverride = 40.0;
+                else
+                    entry.resOverride = -1.0;
+                return;
+            }
+        }
+        if (!slot.empty() && CheckCollisionPointRec(mouse, slotClearBounds()))
+        {
+            slots[static_cast<size_t>(activeSlot)].clear();
+            return;
+        }
+    }
+
     const float wheel = GetMouseWheelMove();
 
     if (wheel != 0.0f)
     {
         const Rectangle listArea{
-            310.0f, 166.0f, 800.0f, 690.0f
+            310.0f, 198.0f, 800.0f, 660.0f
         };
 
         if (CheckCollisionPointRec(mouse, listArea))
@@ -289,7 +475,7 @@ void EnemiesScreen::update(float dt)
             hoveredRow = index;
 
             if (pressed)
-                selectEnemy(
+                toggleSlotEntry(
                     *filtered[static_cast<size_t>(index)]);
 
             break;
@@ -404,6 +590,30 @@ void EnemiesScreen::draw()
             static_cast<int>(filtered.size())),
         1000, 154, 13, kDimText);
 
+    // Encounter slot tabs: exactly five slots, click to arm one for edits.
+    for (int s = 0; s < kSlotCount; ++s)
+    {
+        Rectangle tab = slotTabBounds(s);
+        const bool armed = (s == activeSlot);
+        DrawRectangleRounded(
+            tab, 0.14f, 8,
+            armed ? kAccentBg : kPanelBg);
+        DrawRectangleRoundedLines(
+            tab, 0.14f, 8,
+            armed ? kAccentBorder : kPanelBorder);
+
+        std::string label = "SLOT " + std::to_string(s + 1) +
+            " (" + std::to_string(slots[static_cast<size_t>(s)].size()) + ")";
+        DrawText(
+            label.c_str(),
+            static_cast<int>(tab.x + 10),
+            static_cast<int>(tab.y + 7),
+            12,
+            armed ? RAYWHITE : kDimText);
+    }
+
+
+
     for (int row = 0; row < 10; ++row)
     {
         const int index = scrollOffset + row;
@@ -416,8 +626,16 @@ void EnemiesScreen::draw()
 
         const Rectangle r = rowBounds(row);
 
-        const bool selected =
-            enemy.id == selectedEnemyId;
+        // Selected = present in the ACTIVE slot (toggle model).
+        bool selected = false;
+        for (const auto& entry : slots[static_cast<size_t>(activeSlot)])
+        {
+            if (entry.id == enemy.id)
+            {
+                selected = true;
+                break;
+            }
+        }
 
         const bool hovered =
             index == hoveredRow;
@@ -499,7 +717,7 @@ void EnemiesScreen::draw()
     }
 
     const Rectangle detail{
-        1130.0f, 104.0f, 280.0f, 560.0f
+        1130.0f, 104.0f, 280.0f, 764.0f
     };
 
     DrawRectangleRounded(
@@ -507,8 +725,17 @@ void EnemiesScreen::draw()
     DrawRectangleRoundedLines(
         detail, 0.06f, 8, kPanelBorder);
 
-    const EnemyInfo* selected =
-        enemies.get(selectedEnemyId);
+    // Detail target: hovered row wins, else first entry of active slot.
+    const EnemyInfo* selected = nullptr;
+    if (hoveredRow >= 0 &&
+        hoveredRow < static_cast<int>(filtered.size()))
+        selected = filtered[static_cast<size_t>(hoveredRow)];
+    if (selected == nullptr)
+    {
+        const auto& slot = slots[static_cast<size_t>(activeSlot)];
+        if (!slot.empty())
+            selected = enemies.get(slot.front().id);
+    }
 
     if (!selected)
     {
@@ -517,17 +744,18 @@ void EnemiesScreen::draw()
             1150, 128, 15, kDimText);
 
         DrawText(
-            "Pick a target from the list.",
+            "Click a row to add it to",
             1150, 158, 13, kDimText);
 
         DrawText(
-            "The selected ID will be used by",
-            1150, 204, 12, kDimText);
+            "the active slot below.",
+            1150, 178, 13, kDimText);
 
         DrawText(
-            "the combat setup / simulator.",
-            1150, 224, 12, kDimText);
+            "Click again to remove.",
+            1150, 204, 12, kDimText);
 
+        drawSlotContents();
         return;
     }
 
@@ -627,7 +855,9 @@ void EnemiesScreen::draw()
         1150, y, 12, RAYWHITE,
         238, 18);
 
+    drawSlotContents();
+
     DrawText(
-        "Mouse wheel: scroll list",
+        "Mouse wheel: scroll list | Click a row to toggle it in the armed slot",
         310, 868, 12, kDimText);
 }

@@ -17,11 +17,17 @@ struct ActionEvent {
     int currentAv;          // Cumulative AV when this action happens
     std::string characterId;
     std::string characterName;
-    std::string actionType; // "Basic", "Skill", "Ult", "FUA", "Spawn"
+    std::string actionType; // "Basic", "Skill", "Ult", "FUA", "Heal", "Shield", "Spawn"
     std::string targetEnemyId; // Enemy instance hit ("" for non-damage events)
     int damageDealt;        // Final damage from the Section 1 master formula
     int spChange;           // SP generated/consumed
-    float breakDamage;      // Break damage dealt
+    float breakDamage;      // Break (+ super break) damage dealt
+    float superBreakDamage = 0.0f; // Super Break portion (also in breakDamage)
+    float healAmount = 0.0f;  // HP restored (Heal actions)
+    float shieldAmount = 0.0f;// Shield granted (Shield actions)
+    std::string healTargetId; // Ally receiving heal/shield
+    std::string targetAllyId; // Ally hit by enemy offense
+    float shieldAbsorbed = 0.0f; // Incoming damage stopped by shield
     bool isExtraTurn;       // True if caused by advance action
     // Section 21.4: intermediate multipliers, exposed for debugging/display.
     damage::DamageResult damageBreakdown;
@@ -44,6 +50,7 @@ struct CharacterConfig {
     std::vector<std::string> rotation; // e.g., {"Skill", "Basic", "Basic"}
     bool isAuto = false;    // If true, use simple AI logic
     int level = 80;         // Attacker level for the DEF formula (Sec 4)
+    std::string element;    // Attacker element for per-element RES (Q2); "" = type-bucket fallback
     std::string speedNotes; // Character-specific speed/AV exception notes (informational only)
 
     // Base stats from character data (before LC/relic bonuses)
@@ -85,6 +92,19 @@ struct CharacterConfig {
     double defIgnorePct = 0.0;     // Ignore-DEF effects (Sec 4)
     double ehr = 0.0;              // Effect Hit Rate (Sec 13)
     double effectRes = 0.0;        // Effect RES (Sec 13/22.4; used by debuff application)
+    double breakEffect = 0.0;        // 0..1 scale (e.g. 0.35 = 35%)
+    double outgoingHealingBoost = 0.0; // decimals; see damage::calculateHealAmount
+    double energyRegen = 0.0;        // decimals; scales energy gain
+    // Break milestone: Break-DMG-Increase sources (e.g. Fugue E4).
+    // No gear source (Eidolon-gated); configured per character.
+    double breakDmgIncrease = 0.0;   // decimals; x(1+increase) on break hits
+    // Super Break: 0 = off. >0 enables documented-simplification super
+    // break instances on hits against already-broken enemies.
+    double superBreakModifier = 0.0;
+    // Heal/shield skill data (0 = this character has no such action).
+    // Amounts scale the same scalingStat as damage.
+    double healMultiplier = 0.0;
+    double shieldMultiplier = 0.0;
     // Starting combat buffs (applied for the whole sim; per-turn
     // buff application rules are character-specific, Sec 29).
     double buffAtkPct = 0.0;
@@ -105,6 +125,27 @@ struct CharacterConfig {
     // stackPool: 0 = none, 1 = punchline, 2 = banger.
     int stackCount = 0;
     int stackPool = 0;
+
+    // Super Break trigger rules (beyond the modifier gate):
+    // - superBreakActions: which of this character's action types convert
+    //   toughness damage into super break instances. EMPTY = all damaging
+    //   action types (back-compat default).
+    // - breakEfficiencyBoost: multiplies the converted toughness damage
+    //   (hsr-optimizer effectiveToughness form). 0 = no bonus.
+    // Hard exceptions (e.g. toughness-protection breakers) are not modeled.
+    std::vector<std::string> superBreakActions;
+    double breakEfficiencyBoost = 0.0;
+
+    // Per-skill tuning from the character DB (Sec 22 DB milestone).
+    // Keys: "Basic", "Skill", "Ult", "FUA". Absent/zero entries fall back
+    // to the documented engine defaults (toughness tiers, single
+    // heal/shield multipliers). No values are guessed into the DB.
+    struct SkillActionTuning {
+        int toughnessDamage = 0;   // 0 = fallback tier
+        double healMultiplier = 0.0;   // 0 = single healMultiplier field
+        double shieldMultiplier = 0.0; // 0 = single shieldMultiplier field
+    };
+    std::map<std::string, SkillActionTuning> skillActions;
 };
 
 // Configuration for a single enemy instance.
@@ -116,11 +157,29 @@ struct EnemyConfig {
     int maxHp = 1;
     int currentHp = 1;
     int toughness = 0;
+    double atk = 0.0;               // Enemy ATK (offense damage base)
+    double spd = 100.0;             // Enemy SPD (AV scheduling)
+    // Enemy action damage multiplier (documented fallback 1.0; per-enemy
+    // action data arrives with future enemy-data work).
+    double actionMultiplier = 1.0;
+    // Multi-layered toughness (wiki): non-empty = successive bars; only the
+    // final bar triggers full break effects. Empty = legacy single bar.
+    // No data source yet (monsters_rules.json has one toughness value).
+    std::vector<int> toughnessBars;
+    // Exo-Toughness (wiki): extra bar reduced after the main break, triggering
+    // a second full break when depleted. 0 = none. Restored on recovery turn.
+    int exoToughness = 0;
     int level = 80;                 // Enemy level (display/context; DEF uses baseDef)
     double baseDef = 0.0;           // Enemy total DEF before shred (Sec 4/12)
-    // Base RES: explicit override (< 0 = derive from resistanceType).
+    // Base RES: explicit per-entry override wins when >= 0; otherwise the
+    // Q2 auto-rule (attacker element) or the type bucket applies.
     double baseResOverride = -1.0;
     damage::EnemyResistanceType resistanceType = damage::EnemyResistanceType::Neutral;
+    // Q2 enemy RES data (populated from the enemy DB at build time):
+    // per-element override map (0..1) + weakness list. The engine resolves
+    // per attacker element via damage::resolveRES (weakness-first).
+    std::map<std::string, double> res;
+    std::vector<std::string> weaknesses;
     // Debuffs currently on the enemy (Sec 6/11/12):
     double dmgTakenAll = 0.0;       // All-Type DMG Taken%
     double dmgTakenElemental = 0.0; // Elemental DMG Taken% (matching element)
@@ -161,15 +220,16 @@ struct EncounterConfig {
 
 // Result of a simulation run
 struct SimulationResult {
-    bool success;
+    bool success = false;
     std::string errorMessage;
-    int totalCycles;        // 0 if 0-cycle clear
-    int totalActions;
-    float totalDamage;
-    float totalBreakDamage;
+    int totalCycles = 0;        // 0 if 0-cycle clear
+    int totalActions = 0;
+    float totalDamage = 0.0f;
+    float totalBreakDamage = 0.0f;
     std::vector<ActionEvent> timeline;
     std::map<std::string, int> finalStats; // Final SP, Energy per char
-    bool isZeroCycleClear;  // True if enemy defeated within 150 AV
+    bool isZeroCycleClear = false;  // True if enemy defeated within 150 AV
+    bool partyWiped = false;    // True if all allies fell (enemy offense)
 };
 
 class SimulationEngine {
@@ -224,6 +284,9 @@ private:
         int actionIndex;    // Where in the rotation we are
         int sp;
         float energy;
+        int currentHp;      // Live HP (heals restore up to max; no enemy
+                            // offense exists yet, so nothing depletes it)
+        int shield = 0;     // Absorb pool (consumer: future enemy offense)
         int turnStartSpeed; // Speed basis of the pending threshold (Sec 18)
         int scheduleBaseAv;   // AV clock when the pending threshold was set
         double delayedRequirementPct = 100.0; // Sec 17 advance-cap exception
@@ -231,10 +294,15 @@ private:
 
     struct EnemyState {
         EnemyConfig config;
+        int currentAv = 0; // Next-turn AV threshold (10000/SPD scheduling)
         int currentHp;
         int currentToughness;
+        size_t barIndex = 0; // Active multi-layer bar (bars vector copy below)
+        std::vector<int> bars; // Resolved bars (config bars or {toughness})
+        int currentExo = 0;  // Remaining Exo-Toughness (0 = none/spent)
+        bool exoSpent = false; // Second-break event already fired
         bool active;        // False until spawnAv reached / after death
-        bool broken;        // True once toughness depleted (Sec 7)
+        bool broken;        // True once final toughness depleted (Sec 7)
     };
 
     // Internal helpers
@@ -243,12 +311,31 @@ private:
     // filling intermediates for display. Returns final damage (rounded).
     int calculateHitDamage(const CharState& charState, const EnemyState& enemyState,
                            const std::string& actionType, ActionEvent& outEvent);
-    void applyActionEffects(CharState& charState,
+    void applyActionEffects(std::vector<CharState>& allies,
+                            size_t actorIdx,
                             std::vector<EnemyState>& enemies,
-                            EnemyState& target,
+                            EnemyState* target,
                             const std::string& actionType,
                             int currentGlobalAv,
                             std::vector<ActionEvent>& timeline);
+    // Enemy turn: recovery when broken, otherwise an attack on the lowest-
+    // HP-fraction living ally. Shields absorb first; overflow hits HP.
+    // Returns true if the party was wiped by this action.
+    bool applyEnemyAction(std::vector<CharState>& allies,
+                          EnemyState& enemy,
+                          int currentGlobalAv,
+                          std::vector<ActionEvent>& timeline);
+    // Enemy offense damage (documented minimal role mapping, pending an
+    // enemy-offense formula section): ATK x actionMultiplier x ally DEF
+    // multiplier (Sec 4, attackerLevel = enemy level). No toughness, RES,
+    // vuln, or crit on either side.
+    int calculateEnemyHitDamage(const EnemyConfig& enemy,
+                                const CharacterConfig& ally);
+    // Lowest-HP-fraction ally (heal/shield fallback targeting, documented).
+    size_t lowestHpAlly(const std::vector<CharState>& allies);
+    // Shared break-event computation (layers, final, exo share it).
+    float computeBreakEvent(const CharacterConfig& c, EnemyState& target,
+                            double barMaxToughness);
     bool allEnemiesDefeated(const std::vector<EnemyState>& enemies, int avLimit);
     bool checkZeroCycleClear(const std::vector<EnemyState>& enemies, int currentAv);
 };

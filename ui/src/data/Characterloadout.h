@@ -40,6 +40,9 @@ struct OtherStatBonuses
     double elemDmgPct = 0.0;
     double resPen = 0.0;
     double ehr = 0.0;
+    // Break-DMG-Increase (Eidolon-gated, e.g. Fugue E4): user-asserted,
+    // no gear/DB source. Decimals.
+    double breakDmgIncrease = 0.0;
 };
 
 // Manual base-stat override (Sec 22.1/22.8): lets a player without complete
@@ -73,6 +76,11 @@ struct CharacterLoadout
     OtherStatBonuses otherBonuses;
     ManualBaseStats manualBase;
     int level = 80;          // Character level (attacker level, Sec 4)
+
+    // Manual opt-in per conditional set effect (Q3): effectId -> active.
+    // DEFAULT false and never inferred — the user must explicitly enable
+    // each bonus. Missing key also means false.
+    std::unordered_map<std::string, bool> setEffectActive;
 
     bool initialized = false;
 };

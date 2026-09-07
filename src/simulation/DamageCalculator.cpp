@@ -1,5 +1,6 @@
 #include "DamageCalculator.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 namespace hsr {
@@ -608,6 +609,214 @@ double calculateCritMultiplier(double critRate, double critDmg) {
     double rate = std::clamp(critRate, 0.0, 1.0);
     double dmg = std::max(0.0, critDmg);
     return 1.0 + rate * dmg;
+}
+
+namespace {
+std::string lowerElement(const std::string& s)
+{
+    std::string out = s;
+    for (char& ch : out)
+        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    return out;
+}
+} // namespace
+
+double resolveRES(const std::map<std::string, double>& resMap,
+                  const std::vector<std::string>& weaknesses,
+                  const std::string& element) {
+    std::string el = lowerElement(element);
+    // Weakness always wins, even if the map also has the element.
+    for (const auto& w : weaknesses) {
+        if (lowerElement(w) == el)
+            return 0.0;
+    }
+    for (const auto& kv : resMap) {
+        if (lowerElement(kv.first) == el)
+            return kv.second;
+    }
+    return 0.20;
+}
+
+double calculateHealAmount(double skillHealMultiplier, double outgoingHealingBoost) {
+    return skillHealMultiplier * (1.0 + std::max(0.0, outgoingHealingBoost));
+}
+
+// Base Break DMG by attacker level (1-95).
+// Sourced (spec-grade): HSR wiki Toughness page Level Multiplier table
+// (https://honkai-star-rail.fandom.com/wiki/Toughness#Level_Multiplier),
+// anchor-verified against the HSR DMG Calculator sheet (L65=2176.7983)
+// and hsr-optimizer damageCalculator.ts (L80=3767.5533).
+// Levels 81-95 are enemy-exclusive per the wiki (kept for completeness).
+static double baseBreakByLevelTable(int level)
+{
+    static const double kTable[96] = {
+        0.0, // [0] unused
+        54, // [1]
+        58, // [2]
+        62, // [3]
+        67.5264, // [4]
+        70.5094, // [5]
+        73.5228, // [6]
+        76.566, // [7]
+        79.6385, // [8]
+        82.7395, // [9]
+        85.8684, // [10]
+        91.4944, // [11]
+        97.068, // [12]
+        102.5892, // [13]
+        108.0579, // [14]
+        113.4743, // [15]
+        118.8383, // [16]
+        124.1499, // [17]
+        129.4091, // [18]
+        134.6159, // [19]
+        139.7703, // [20]
+        149.3323, // [21]
+        158.8011, // [22]
+        168.1768, // [23]
+        177.4594, // [24]
+        186.6489, // [25]
+        195.7452, // [26]
+        204.7484, // [27]
+        213.6585, // [28]
+        222.4754, // [29]
+        231.1992, // [30]
+        246.4276, // [31]
+        261.181, // [32]
+        275.4733, // [33]
+        289.3179, // [34]
+        302.7275, // [35]
+        315.7144, // [36]
+        328.2905, // [37]
+        340.4671, // [38]
+        352.2554, // [39]
+        363.6658, // [40]
+        408.124, // [41]
+        451.7883, // [42]
+        494.6798, // [43]
+        536.8188, // [44]
+        578.2249, // [45]
+        618.9172, // [46]
+        658.9138, // [47]
+        698.2325, // [48]
+        736.8905, // [49]
+        774.9041, // [50]
+        871.0599, // [51]
+        964.8705, // [52]
+        1056.4206, // [53]
+        1145.791, // [54]
+        1233.0585, // [55]
+        1318.2965, // [56]
+        1401.575, // [57]
+        1482.9608, // [58]
+        1562.5178, // [59]
+        1640.3068, // [60]
+        1752.3215, // [61]
+        1861.9011, // [62]
+        1969.1242, // [63]
+        2074.0659, // [64]
+        2176.7983, // [65]
+        2277.3904, // [66]
+        2375.9085, // [67]
+        2472.416, // [68]
+        2566.9739, // [69]
+        2659.6406, // [70]
+        2780.3044, // [71]
+        2898.6022, // [72]
+        3014.6029, // [73]
+        3128.3729, // [74]
+        3239.9758, // [75]
+        3349.473, // [76]
+        3456.9236, // [77]
+        3562.3843, // [78]
+        3665.9099, // [79]
+        3767.5533, // [80]
+        3957.8618, // [81]
+        4155.2118, // [82]
+        4359.8638, // [83]
+        4572.0878, // [84]
+        4792.1641, // [85]
+        5020.3833, // [86]
+        5257.0466, // [87]
+        5502.4664, // [88]
+        5756.9667, // [89]
+        6020.8836, // [90]
+        6294.5654, // [91]
+        6578.3734, // [92]
+        6872.6823, // [93]
+        7177.8806, // [94]
+        7494.3713, // [95]
+    };
+    if (level < 1) return kTable[1];
+    if (level > 95) return kTable[95];
+    return kTable[level];
+}
+
+double baseBreakByLevel(int level) {
+    return baseBreakByLevelTable(level);
+}
+
+double elementBreakMultiplier(const std::string& element) {
+    std::string el = lowerElement(element);
+    // Wiki Break Properties table (+ calculator sheet + two guides).
+    if (el == "physical" || el == "fire") return 2.0;
+    if (el == "wind") return 1.5;
+    if (el == "ice" || el == "lightning") return 1.0;
+    if (el == "quantum" || el == "imaginary") return 0.5;
+    // Unknown/empty element: neutral default (documented, not sourced).
+    return 1.0;
+}
+
+BreakDamageResult calculateBreakDamage(const BreakDamageConfig& config) {
+    BreakDamageResult result;
+
+    double base = baseBreakByLevel(config.attackerLevel);
+    double elemMult = elementBreakMultiplier(config.attackerElement);
+    result.baseBreak = elemMult * base;
+
+    // Max Toughness Multiplier = 0.5 + maxToughness / 40 (wiki).
+    double maxTough = std::max(0.0, config.enemyMaxToughness);
+    result.toughnessMultiplier = 0.5 + maxTough / 40.0;
+
+    result.defenseMultiplier = calculateDefenseMultiplier(config.defenseConfig);
+    result.resistanceMultiplier = calculateResistanceMultiplier(config.resistanceConfig);
+    result.vulnerabilityMultiplier = calculateVulnerabilityMultiplier(config.vulnerabilityConfig);
+    result.universalReductionMultiplier =
+        calculateUniversalDamageReductionMultiplier(config.universalReductionConfig);
+
+    // Ability Multiplier defaults to 1.0 (unmodeled per-hit ability mults).
+    // CRIT, DMG Boost and Weaken are excluded per source.
+    result.finalBreakDamage = result.baseBreak
+        * result.toughnessMultiplier
+        * (1.0 + std::max(0.0, config.breakEffect))
+        * (1.0 + std::max(0.0, config.breakDmgIncrease))
+        * result.defenseMultiplier
+        * result.resistanceMultiplier
+        * result.vulnerabilityMultiplier
+        * result.universalReductionMultiplier;
+
+    return result;
+}
+
+double calculateSuperBreakDamage(
+    double toughnessDamage,
+    double breakEffect,
+    double superBreakModifier,
+    double defenseMultiplier,
+    double resistanceMultiplier,
+    double vulnerabilityMultiplier,
+    double universalBrokenMultiplier) {
+    if (toughnessDamage <= 0.0 || superBreakModifier <= 0.0)
+        return 0.0;
+    // (baseBreakByLevel(80) / 10) per hsr-optimizer SuperBreakDamageFunction.
+    double superBreakBase = (baseBreakByLevel(80) / 10.0) * toughnessDamage;
+    return superBreakBase
+        * (1.0 + std::max(0.0, breakEffect))
+        * superBreakModifier
+        * defenseMultiplier
+        * resistanceMultiplier
+        * vulnerabilityMultiplier
+        * universalBrokenMultiplier;
 }
 
 // ============================================================================

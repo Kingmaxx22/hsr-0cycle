@@ -59,6 +59,21 @@ bool CharacterDatabase::load(const std::string& dataDir)
             }
         }
 
+        // Optional per-skill tuning (additive; absent = engine fallbacks).
+        if (rec.contains("skills") && rec["skills"].is_object())
+        {
+            for (auto& [action, data] : rec["skills"].items())
+            {
+                if (!data.is_object())
+                    continue;
+                SkillTuning tuning;
+                tuning.toughness = data.value("toughness", 0);
+                tuning.heal = data.value("heal", 0.0);
+                tuning.shield = data.value("shield", 0.0);
+                info.skills[action] = tuning;
+            }
+        }
+
         if (info.id.empty())
             continue;
 

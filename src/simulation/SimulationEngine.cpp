@@ -18,6 +18,8 @@ int SimulationEngine::calculateActionCost(int speed, const std::string& actionTy
         return baseAv;
     } else if (actionType == "Skill") {
         return baseAv; // Skill uses standard action
+    } else if (actionType == "Heal" || actionType == "Shield") {
+        return baseAv; // Support actions consume a full turn
     } else if (actionType == "Ult") {
         return 0; // Ultimate is instant, doesn't consume turn
     } else if (actionType == "FUA") {
@@ -90,7 +92,7 @@ int SimulationEngine::calculateHitDamage(const CharState& charState,
     damage::MasterDamageConfig dmg;
     dmg.baseDamageConfig.skillMultiplier = skillMult;
     dmg.baseDamageConfig.scalingAttributeValue = scalingValue;
-    // Section 3 (+ starting buff DMG%).
+    // Section 3 (+ starting buff DMG% + generic set "damage" bonuses).
     dmg.dmgPercentMultiplier = 1.0 + c.elementalDmgPct + c.allTypeDmgPct + c.buffDmgPct;
     // Section 4 + Section 12 shred.
     dmg.defenseConfig.attackerLevel = std::max(1, c.level);
@@ -98,9 +100,14 @@ int SimulationEngine::calculateHitDamage(const CharState& charState,
     dmg.defenseConfig.defIgnorePercent = c.defIgnorePct;
     dmg.defenseConfig.shredPercent = enemyState.config.defShredTaken;
     dmg.defenseConfig.isPlightDifficulty = enemyState.config.isPlightDifficulty;
-    // Section 5: attacker PEN stacks with enemy RES reduction (Sec 21.3).
+    // Section 5 / Q2: explicit per-entry override wins; otherwise the
+    // per-attacker-element auto-rule (when the attacker has an element);
+    // otherwise the legacy type-bucket path.
     dmg.resistanceConfig.resistanceType = enemyState.config.resistanceType;
     dmg.resistanceConfig.explicitBaseRES = enemyState.config.baseResOverride;
+    if (dmg.resistanceConfig.explicitBaseRES < 0.0 && !c.element.empty())
+        dmg.resistanceConfig.explicitBaseRES = damage::resolveRES(
+            enemyState.config.res, enemyState.config.weaknesses, c.element);
     dmg.resistanceConfig.resPenetration = c.resPen + enemyState.config.resReduction;
     // Section 6.
     dmg.damageTakenConfig.elementalDMGTaken = enemyState.config.dmgTakenElemental;
@@ -133,69 +140,297 @@ int SimulationEngine::calculateHitDamage(const CharState& charState,
     return std::max(0, static_cast<int>(std::lround(finalDamage)));
 }
 
+size_t SimulationEngine::lowestHpAlly(const std::vector<CharState>& allies) {
+    // Living allies only (hp > 0): no revive mechanics this phase, so the
+    // dead are neither targeted nor healed back up.
+    size_t best = 0;
+    double bestFrac = 2.0;
+    bool found = false;
+    for (size_t i = 0; i < allies.size(); ++i) {
+        if (allies[i].currentHp <= 0)
+            continue;
+        double maxHp = effectiveStat(allies[i].config, "hp");
+        if (maxHp < 1.0) maxHp = 1.0;
+        double frac = static_cast<double>(allies[i].currentHp) / maxHp;
+        if (frac < bestFrac) {
+            bestFrac = frac;
+            best = i;
+            found = true;
+        }
+    }
+    if (!found && !allies.empty())
+        return 0;
+    return best;
+}
+
+int SimulationEngine::calculateEnemyHitDamage(const EnemyConfig& enemy,
+                                             const CharacterConfig& ally) {
+    // Documented minimal role mapping (pending an enemy-offense section):
+    // enemy ATK x actionMultiplier, mitigated by the ally's total DEF via
+    // the Sec 4 formula with attackerLevel = enemy level. Allies have no
+    // toughness/RES/vuln/crit states, so those stages are 1.0.
+    damage::DefenseMultiplierConfig def;
+    def.attackerLevel = std::max(1, enemy.level);
+    def.enemyBaseDEF = effectiveStat(ally, "def");
+    double defMult = damage::calculateDefenseMultiplier(def);
+    double raw = enemy.atk * std::max(0.0, enemy.actionMultiplier) * defMult;
+    return std::max(0, static_cast<int>(std::lround(raw)));
+}
+
+bool SimulationEngine::applyEnemyAction(std::vector<CharState>& allies,
+                                       EnemyState& enemy,
+                                       int currentGlobalAv,
+                                       std::vector<ActionEvent>& timeline) {
+    ActionEvent event;
+    event.characterId = enemy.config.id;
+    event.characterName = enemy.config.name;
+    event.targetEnemyId = enemy.config.id;
+    event.currentAv = currentGlobalAv;
+    int enemySpd = 100;
+    // Enemy AV cost display: threshold spacing (informational).
+    enemySpd = static_cast<int>(std::lround(std::max(1.0, enemy.config.spd)));
+    event.avCost = 10000 / std::max(1, enemySpd);
+    event.isExtraTurn = false;
+
+    if (enemy.broken) {
+        // Recovery turn (wiki): the turn is consumed restoring toughness
+        // (current bar, full) and Exo-Toughness (full, re-depletable).
+        // No attack is made on a recovery turn.
+        event.actionType = "EnemyRecover";
+        enemy.broken = false;
+        if (enemy.barIndex < enemy.bars.size())
+            enemy.currentToughness = enemy.bars[enemy.barIndex];
+        if (enemy.config.exoToughness > 0) {
+            enemy.currentExo = enemy.config.exoToughness;
+            enemy.exoSpent = false;
+        }
+        timeline.push_back(event);
+        return false;
+    }
+
+    event.actionType = "EnemyAtk";
+    // Target: lowest-HP-fraction living ally (documented fallback).
+    size_t targetIdx = lowestHpAlly(allies);
+    if (allies[targetIdx].currentHp <= 0)
+        return true; // No living ally (wipe detected by caller).
+    event.targetAllyId = allies[targetIdx].config.id;
+
+    int raw = calculateEnemyHitDamage(enemy.config, allies[targetIdx].config);
+    event.damageDealt = raw;
+    // Shields absorb first; overflow reaches HP.
+    int absorbed = std::min(allies[targetIdx].shield, raw);
+    allies[targetIdx].shield -= absorbed;
+    event.shieldAbsorbed = static_cast<float>(absorbed);
+    allies[targetIdx].currentHp = std::max(0, allies[targetIdx].currentHp - (raw - absorbed));
+    timeline.push_back(event);
+
+    for (const auto& cs : allies) {
+        if (cs.currentHp > 0)
+            return false;
+    }
+    return true; // Party wiped.
+}
+
+float SimulationEngine::computeBreakEvent(const CharacterConfig& c, EnemyState& target,
+                                         double barMaxToughness) {
+    damage::BreakDamageConfig bc;
+    bc.attackerLevel = std::max(1, c.level);
+    bc.attackerElement = c.element;
+    bc.breakEffect = c.breakEffect;
+    bc.breakDmgIncrease = c.breakDmgIncrease;
+    bc.enemyMaxToughness = barMaxToughness;
+    bc.defenseConfig.attackerLevel = std::max(1, c.level);
+    bc.defenseConfig.enemyBaseDEF = target.config.baseDef;
+    bc.defenseConfig.defIgnorePercent = c.defIgnorePct;
+    bc.defenseConfig.shredPercent = target.config.defShredTaken;
+    bc.defenseConfig.isPlightDifficulty = target.config.isPlightDifficulty;
+    bc.resistanceConfig.resistanceType = target.config.resistanceType;
+    bc.resistanceConfig.explicitBaseRES = target.config.baseResOverride;
+    if (bc.resistanceConfig.explicitBaseRES < 0.0 && !c.element.empty())
+        bc.resistanceConfig.explicitBaseRES = damage::resolveRES(
+            target.config.res, target.config.weaknesses, c.element);
+    bc.resistanceConfig.resPenetration = c.resPen + target.config.resReduction;
+    bc.vulnerabilityConfig.sumVULN = target.config.vulnSum;
+    if (target.config.specialVuln > 0.0) {
+        bc.vulnerabilityConfig.vulnType = damage::EnemyVulnerabilityType::Special;
+        bc.vulnerabilityConfig.specialVulnEnemy = target.config.specialVuln;
+    }
+    // The break hit lands while the enemy still counts as unbroken
+    // (x0.9, wiki) — compute BEFORE flipping the broken flag.
+    bc.universalReductionConfig.isEnemyBroken = false;
+    damage::BreakDamageResult br = damage::calculateBreakDamage(bc);
+    int amount = static_cast<int>(std::lround(br.finalBreakDamage));
+    target.currentHp = std::max(0, target.currentHp - amount);
+    return static_cast<float>(amount);
+}
+
 void SimulationEngine::applyActionEffects(
-    CharState& charState,
+    std::vector<CharState>& allies,
+    size_t actorIdx,
     std::vector<EnemyState>& enemies,
-    EnemyState& target,
+    EnemyState* target,
     const std::string& actionType,
     int currentGlobalAv,
     std::vector<ActionEvent>& timeline) {
 
     (void)enemies;
+    CharState& charState = allies[actorIdx];
+    const bool isHeal = (actionType == "Heal");
+    const bool isShield = (actionType == "Shield");
+    const bool isSupport = isHeal || isShield;
 
     ActionEvent event;
     event.characterId = charState.config.id;
     event.characterName = charState.config.name;
     event.actionType = actionType;
-    event.targetEnemyId = target.config.id;
+    event.targetEnemyId = (target != nullptr && !isSupport) ? target->config.id : "";
     event.currentAv = currentGlobalAv;
     event.avCost = calculateActionCost(effectiveSpeed(charState.config), actionType);
     event.isExtraTurn = false;
     event.breakDamage = 0.0f;
 
-    // Section 1 master formula via the implemented Sections 2-8/11 stages.
-    event.damageDealt = calculateHitDamage(charState, target, actionType, event);
+    // Per-skill tuning (Sec 22 DB): present-and-positive wins, otherwise
+    // the documented engine fallbacks below. Never guessed into the DB.
+    const CharacterConfig::SkillActionTuning* tuning = nullptr;
+    {
+        auto it = charState.config.skillActions.find(actionType);
+        if (it != charState.config.skillActions.end())
+            tuning = &it->second;
+    }
 
-    // SP changes
+    if (isSupport) {
+        // Heal/shield scale the character's scaling stat.
+        // No enemy damage, no toughness interaction, no crit.
+        double scalingValue = effectiveStat(charState.config, charState.config.scalingStat);
+        size_t allyIdx = lowestHpAlly(allies);
+        event.healTargetId = allies[allyIdx].config.id;
+        if (isHeal) {
+            double mult = (tuning != nullptr && tuning->healMultiplier > 0.0)
+                ? tuning->healMultiplier : charState.config.healMultiplier;
+            double amount = damage::calculateHealAmount(
+                mult * scalingValue,
+                charState.config.outgoingHealingBoost);
+            int heal = std::max(0, static_cast<int>(std::lround(amount)));
+            double maxHp = effectiveStat(allies[allyIdx].config, "hp");
+            allies[allyIdx].currentHp = std::min(static_cast<int>(std::lround(maxHp)),
+                                                allies[allyIdx].currentHp + heal);
+            event.healAmount = static_cast<float>(heal);
+        } else {
+            // Shield formula: base x shieldBoost (wiki); shieldBoost sources
+            // unmodeled. Shields stack and absorb enemy offense.
+            double mult = (tuning != nullptr && tuning->shieldMultiplier > 0.0)
+                ? tuning->shieldMultiplier : charState.config.shieldMultiplier;
+            int shield = std::max(0, static_cast<int>(std::lround(
+                mult * scalingValue)));
+            allies[allyIdx].shield += shield;
+            event.shieldAmount = static_cast<float>(shield);
+        }
+    } else {
+        // Section 1 master formula via the implemented Sections 2-8/11 stages.
+        event.damageDealt = calculateHitDamage(charState, *target, actionType, event);
+    }
+
+    // SP changes. Heal/Shield cost SP like Skill (fallback convention:
+    // per-action SP costs are character data in the Sec 22 DB milestone).
     if (actionType == "Basic") {
         event.spChange = 1;
         charState.sp = std::min(charState.sp + 1, charState.config.maxSp);
-    } else if (actionType == "Skill") {
+    } else if (actionType == "Skill" || isSupport) {
         event.spChange = -1;
         charState.sp = std::max(charState.sp - 1, 0);
     } else {
         event.spChange = 0;
     }
 
-    // Energy gain (Ult already had the energy to fire)
-    float energyGain = 20.0f;
+    // Energy gain (Ult already had the energy to fire), scaled by
+    // Energy Regen rope stat (Q1 live behavior).
+    float energyGain = 20.0f * static_cast<float>(1.0 + std::max(0.0, charState.config.energyRegen));
     if (actionType == "Ult") energyGain = 0.0f;
     charState.energy = std::min(charState.energy + energyGain, charState.config.maxEnergy);
 
-    // Apply damage to the target enemy
-    target.currentHp = std::max(0, target.currentHp - event.damageDealt);
+    if (!isSupport && target != nullptr) {
+        // Apply damage to the target enemy
+        target->currentHp = std::max(0, target->currentHp - event.damageDealt);
 
-    // Toughness damage tiers are fallback defaults until per-skill toughness
-    // values arrive with the Section 22 character-data work.
-    int toughnessDamage = 20;
-    if (actionType == "Basic") toughnessDamage = 10;
-    else if (actionType == "Skill") toughnessDamage = 20;
-    else if (actionType == "Ult") toughnessDamage = 30;
-    else if (actionType == "FUA") toughnessDamage = 10;
+        // Toughness damage: per-skill DB value wins when present and
+        // positive; otherwise the documented fallback tiers.
+        int toughnessDamage = 20;
+        if (tuning != nullptr && tuning->toughnessDamage > 0) {
+            toughnessDamage = tuning->toughnessDamage;
+        } else if (actionType == "Basic") toughnessDamage = 10;
+        else if (actionType == "Skill") toughnessDamage = 20;
+        else if (actionType == "Ult") toughnessDamage = 30;
+        else if (actionType == "FUA") toughnessDamage = 10;
 
-    if (event.damageDealt > 0 && !target.broken) {
-        target.currentToughness = std::max(0, target.currentToughness - toughnessDamage);
-        if (target.currentToughness == 0) {
-            // Broken: the modeled effect is the Section 7 built-in 10%
-            // reduction switching off. Bonus break-event damage uses the
-            // level/break-effect formula (no section yet) — recorded as 0
-            // rather than a placeholder constant.
-            target.broken = true;
-            event.breakDamage = 0.0f;
+        const CharacterConfig& c = charState.config;
+        if (event.damageDealt > 0 && !target->broken) {
+            target->currentToughness = std::max(0, target->currentToughness - toughnessDamage);
+            if (target->currentToughness == 0) {
+                if (target->barIndex + 1 < target->bars.size()) {
+                    // Non-final layer (wiki multi-layered toughness): Break
+                    // DMG only — no delay, no debuff, no broken state.
+                    event.breakDamage = computeBreakEvent(
+                        c, *target,
+                        static_cast<double>(target->bars[target->barIndex]));
+                    target->barIndex++;
+                    target->currentToughness = target->bars[target->barIndex];
+                } else {
+                    // Final bar: full Weakness Break event.
+                    event.breakDamage = computeBreakEvent(
+                        c, *target,
+                        static_cast<double>(target->bars[target->barIndex]));
+                    target->broken = true;
+                }
+            }
+        } else if (event.damageDealt > 0 && target->broken) {
+            // Super Break (documented simplification): attacker converts
+            // toughness damage dealt to the broken enemy while Exo also
+            // depletes independently below. Trigger rules: modifier gate,
+            // plus per-action allowlist when configured (empty = all
+            // damaging types); efficiency scales the converted amount.
+            // Hard exceptions (protection-state breakers) are not modeled.
+            bool superAllowed = (c.superBreakModifier > 0.0);
+            if (superAllowed && !c.superBreakActions.empty()) {
+                superAllowed = false;
+                for (const auto& allowed : c.superBreakActions) {
+                    if (allowed == actionType) {
+                        superAllowed = true;
+                        break;
+                    }
+                }
+            }
+            if (superAllowed) {
+                damage::UniversalDamageReductionConfig uniBroken;
+                uniBroken.isEnemyBroken = true;
+                double effectiveTough = static_cast<double>(toughnessDamage) *
+                    (1.0 + std::max(0.0, c.breakEfficiencyBoost));
+                double superBreak = damage::calculateSuperBreakDamage(
+                    effectiveTough,
+                    c.breakEffect, c.superBreakModifier,
+                    event.damageBreakdown.defenseMultiplier,
+                    event.damageBreakdown.resistanceMultiplier,
+                    event.damageBreakdown.vulnerabilityMultiplier,
+                    damage::calculateUniversalDamageReductionMultiplier(uniBroken));
+                int superAmount = std::max(0, static_cast<int>(std::lround(superBreak)));
+                event.superBreakDamage = static_cast<float>(superAmount);
+                event.breakDamage += event.superBreakDamage;
+                target->currentHp = std::max(0, target->currentHp - superAmount);
+            }
+            // Exo-Toughness (wiki): any further hits deplete it; at zero it
+            // triggers a second full break event, then stays spent.
+            if (target->currentExo > 0) {
+                target->currentExo = std::max(0, target->currentExo - toughnessDamage);
+                if (target->currentExo == 0 && !target->exoSpent) {
+                    target->exoSpent = true;
+                    event.breakDamage += computeBreakEvent(
+                        c, *target,
+                        static_cast<double>(target->config.exoToughness));
+                }
+            }
         }
+        if (target->currentHp <= 0)
+            target->active = false;
     }
-    if (target.currentHp <= 0)
-        target.active = false;
 
     timeline.push_back(event);
 }
@@ -267,6 +502,8 @@ SimulationResult SimulationEngine::runSimulation(
         state.actionIndex = 0;
         state.sp = config.currentSp;
         state.energy = config.energy;
+        // Live HP pool for heal targeting (clamped: a 0-HP actor is nonsense).
+        state.currentHp = std::max(1, static_cast<int>(std::lround(effectiveStat(config, "hp"))));
         state.turnStartSpeed = effectiveSpeed(config);
         state.scheduleBaseAv = 0;
         // First-turn threshold from effective speed (Sec 15/16).
@@ -274,14 +511,27 @@ SimulationResult SimulationEngine::runSimulation(
         charStates.push_back(state);
     }
 
+    auto enemyAvCost = [](double spd) {
+        return 10000 / std::max(1, static_cast<int>(std::lround(std::max(1.0, spd))));
+    };
+
     std::vector<EnemyState> enemyStates;
     for (const auto& e : encounter.flatten()) {
         EnemyState state;
         state.config = e;
         state.currentHp = e.currentHp;
-        state.currentToughness = e.toughness;
+        // Multi-layered bars, or the legacy single bar (wiki).
+        state.bars = e.toughnessBars.empty()
+            ? std::vector<int>{e.toughness}
+            : e.toughnessBars;
+        state.barIndex = 0;
+        state.currentToughness = state.bars[0];
+        state.currentExo = std::max(0, e.exoToughness);
         state.active = (e.spawnAv <= 0);
         state.broken = false;
+        // First turn threshold from enemy SPD (present) or spawn clock.
+        state.currentAv = (e.spawnAv <= 0) ? enemyAvCost(e.spd)
+                                           : e.spawnAv + enemyAvCost(e.spd);
         enemyStates.push_back(state);
     }
 
@@ -333,20 +583,47 @@ SimulationResult SimulationEngine::runSimulation(
             continue;
         }
 
-        // Find character with lowest currentAv (next to act)
+        // Next actor: lowest AV among living allies and active enemies.
+        // Dead allies (hp <= 0) never act; dead/inactive enemies neither.
         int actingCharIdx = -1;
+        int actingEnemyIdx = -1;
         int minAv = INT32_MAX;
 
         for (size_t i = 0; i < charStates.size(); ++i) {
-            if (charStates[i].currentAv < minAv) {
+            if (charStates[i].currentHp > 0 && charStates[i].currentAv < minAv) {
                 minAv = charStates[i].currentAv;
                 actingCharIdx = static_cast<int>(i);
             }
         }
+        for (size_t i = 0; i < enemyStates.size(); ++i) {
+            if (enemyStates[i].active && enemyStates[i].currentHp > 0 &&
+                enemyStates[i].currentAv < minAv) {
+                minAv = enemyStates[i].currentAv;
+                actingCharIdx = -1;
+                actingEnemyIdx = static_cast<int>(i);
+            }
+        }
 
-        if (actingCharIdx == -1) break;
+        if (actingCharIdx == -1 && actingEnemyIdx == -1) break;
 
-        CharState& actingChar = charStates[actingCharIdx];
+        if (actingEnemyIdx >= 0) {
+            // ---- Enemy turn (offense / recovery) ----
+            EnemyState& actingEnemy = enemyStates[static_cast<size_t>(actingEnemyIdx)];
+            currentGlobalAv = actingEnemy.currentAv;
+            if (currentGlobalAv > avLimit) break;
+            bool wiped = applyEnemyAction(charStates, actingEnemy, currentGlobalAv, result.timeline);
+            actingEnemy.currentAv += enemyAvCost(actingEnemy.config.spd);
+            if (wiped) {
+                result.partyWiped = true;
+                result.success = false;
+                result.errorMessage = "Party wiped by enemy offense";
+                result.totalCycles = (currentGlobalAv + 14999) / 15000;
+                break;
+            }
+            continue;
+        }
+
+        CharState& actingChar = charStates[static_cast<size_t>(actingCharIdx)];
         currentGlobalAv = actingChar.currentAv;
         if (currentGlobalAv > avLimit) break;
 
@@ -410,13 +687,16 @@ SimulationResult SimulationEngine::runSimulation(
             }
         }
 
-        // Check if we can actually perform the action (SP check for skill)
-        if (actionToTake == "Skill" && actingChar.sp < 1) {
+        // Check if we can actually perform the action (SP check for
+        // SP-costing actions; the auto-AI only picks Basic/Skill).
+        if ((actionToTake == "Skill" || actionToTake == "Heal" ||
+             actionToTake == "Shield") && actingChar.sp < 1) {
             actionToTake = "Basic"; // Fallback to basic if no SP
         }
 
         // Apply action effects
-        applyActionEffects(actingChar, enemyStates, *target, actionToTake, currentGlobalAv, result.timeline);
+        size_t actorIdx = static_cast<size_t>(actingCharIdx);
+        applyActionEffects(charStates, actorIdx, enemyStates, target, actionToTake, currentGlobalAv, result.timeline);
 
         // Update totals (damage actions only — Spawn events carry no damage)
         result.totalActions++;
@@ -461,8 +741,10 @@ SimulationResult SimulationEngine::runSimulation(
         }
     }
 
-    // Determine final result
-    if (allEnemiesDefeated(enemyStates, avLimit)) {
+    // Determine final result (a wipe set its own outcome mid-loop).
+    if (result.partyWiped) {
+        // success=false + error already recorded; nothing to overwrite.
+    } else if (allEnemiesDefeated(enemyStates, avLimit)) {
         result.success = true;
         if (result.isZeroCycleClear) {
             result.totalCycles = 0;
@@ -487,6 +769,9 @@ SimulationResult SimulationEngine::runSimulation(
         result.finalStats[state.config.id + "_def"] =
             static_cast<int>(std::lround(effectiveStat(state.config, "def")));
         result.finalStats[state.config.id + "_spd"] = effectiveSpeed(state.config);
+        // Live pools (heal/shield state): current HP + absorb shield.
+        result.finalStats[state.config.id + "_hpcur"] = state.currentHp;
+        result.finalStats[state.config.id + "_shield"] = state.shield;
     }
     for (const auto& e : enemyStates) {
         result.finalStats["enemy_" + e.config.id + "_hp"] = e.currentHp;

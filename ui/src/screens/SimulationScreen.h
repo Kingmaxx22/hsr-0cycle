@@ -21,8 +21,10 @@ public:
     void update(float dt) override;
     void draw() override;
 
-    // Set the enemy to simulate against
-    void setSelectedEnemy(const std::string& enemyId);
+    // Set the full 5-slot encounter to simulate against (Sec 22.9).
+    // Replaces single-enemy selection: the App builds this from the
+    // Enemies screen slots, so there is exactly one enemy source of truth.
+    void setEncounter(const hsr::EncounterConfig& encounter);
     
     // Add a character to the simulation
     void addCharacter(const hsr::CharacterConfig& config);
@@ -71,10 +73,13 @@ private:
     EnemyDatabase& enemies;
     
     // Simulation state
-    std::string selectedEnemyId;
+    hsr::EncounterConfig currentEncounter;
+    bool hasEncounter = false;
     std::vector<hsr::CharacterConfig> characters;
-    hsr::EnemyConfig currentEnemy;
+    hsr::EnemyConfig currentEnemy; // first encounter enemy, for display
     hsr::SimulationResult lastResult;
+
+    size_t encounterEnemyCount() const;
     
     // UI state
     bool isRunning;

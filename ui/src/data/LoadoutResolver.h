@@ -12,26 +12,28 @@
 //
 // Pure logic, no Raylib — safe to unit-test outside the UI.
 //
-// Known gap: relic/planar SET bonuses are not applied because
-// relic_sets_rules.json carries no bonus data (id/name/category only).
-// Set names are still recorded on the loadout for later use.
+// Set bonuses apply from the structured pieces."2"/"4".effects[] data.
+// Unconditional stat_modifier effects auto-apply; conditioned effects need
+// an explicit setEffectActive opt-in (default false, never inferred).
 
 #include "CharacterDatabase.h"
 #include "Characterloadout.h"
 #include "LightConeDatabase.h"
+#include "Relicsetdatabase.h"
 #include "simulation/SimulationEngine.h"
 
 #include <string>
 
 namespace loadout {
 
-// Bonus-only aggregates from gear mains + substats + other bonuses.
-// Percent fields are decimals (0.15 = 15%); flats are raw values.
+// Bonus-only aggregates from gear mains + substats + set bonuses +
+// other bonuses. Percent fields are decimals (0.15 = 15%); flats raw.
 struct ResolvedBonuses
 {
     double hpPct = 0.0;
     double atkPct = 0.0;
     double defPct = 0.0;
+    double spdPct = 0.0; // %Spd scales base speed only (Sec 15)
     double flatHp = 0.0;
     double flatAtk = 0.0;
     double flatDef = 0.0;
@@ -39,9 +41,14 @@ struct ResolvedBonuses
     double critRate = 0.0;
     double critDmg = 0.0;
     double elemDmgPct = 0.0;
+    double allTypeDmgPct = 0.0; // generic "damage" bonuses (Sec 3 pool)
     double resPen = 0.0;
     double ehr = 0.0;
     double effectRes = 0.0;
+    double breakEffect = 0.0;
+    double healingBoost = 0.0; // character.outgoingHealingBoost
+    double energyRegen = 0.0;  // live: scales engine energy gain
+    double breakDmgIncrease = 0.0; // live: x(1+increase) on break hits
 };
 
 // Final combat totals after the base+LC merge (Sec 9 formula stages).
@@ -60,6 +67,30 @@ double parseStatValueText(const std::string& text, const std::string& key);
 // Gear mains + substats + other bonuses, combined (no base stats, no LC).
 ResolvedBonuses resolveGearBonuses(const CharacterLoadout& loadout);
 
+// Stable opt-in key for one parsed set effect.
+std::string setEffectId(const std::string& setId, const std::string& piece,
+                        size_t index);
+
+// Auto-derivation milestone: a damage_type condition whose element matches
+// the attacker's element is active from turn state (no toggle needed).
+// All other condition kinds stay manual-only (no stacks/HP/memosprite
+// counters exist yet). Case-insensitive; empty element never auto-matches.
+bool isSetEffectAutoActive(const SetEffectCondition& condition,
+                           const std::string& attackerElement);
+
+// Effective activation: manual opt-in OR auto-derivation.
+bool isSetEffectActive(const SetEffectCondition& condition,
+                       bool manualToggle, const std::string& attackerElement);
+
+// Set bonuses from the equipped sets (Q1/Q3): unconditional stat_modifier
+// effects always apply; conditioned effects apply ONLY when the matching
+// setEffectActive toggle is true (default false, never inferred).
+// 2pc: set matches relicSetA / relicSetB / planarSet.
+// 4pc: relicFourPiece && set matches relicSetA.
+ResolvedBonuses resolveSetBonuses(const CharacterLoadout& loadout,
+                                  const RelicSetDatabase& relicSets,
+                                  const std::string& attackerElement);
+
 // Base stats: manual override wins when enabled (Sec 22.1/22.8),
 // otherwise the character database entry.
 void resolveBaseStats(const CharacterInfo& info, const CharacterLoadout& loadout,
@@ -71,9 +102,12 @@ void resolveLightConeBase(const CharacterLoadout& loadout,
                           double& hp, double& atk, double& def);
 
 // Full totals: (base + LC) x (1 + %) + flat, per Sec 9.
+// Includes gear, set bonuses (gated conditionals need opt-in toggles),
+// and other bonuses.
 ResolvedTotals resolveTotals(const CharacterInfo& info,
                              const CharacterLoadout& loadout,
-                             const LightConeDatabase& lightCones);
+                             const LightConeDatabase& lightCones,
+                             const RelicSetDatabase& relicSets);
 
 // Full Sec 22.3 component workflow: fills every engine input the formula
 // stages need (component splits for Sec 9, combat stats for Sec 21.2).
@@ -82,7 +116,8 @@ ResolvedTotals resolveTotals(const CharacterInfo& info,
 void applyToCharacterConfig(hsr::CharacterConfig& config,
                             const CharacterInfo& info,
                             const CharacterLoadout& loadout,
-                            const LightConeDatabase& lightCones);
+                            const LightConeDatabase& lightCones,
+                            const RelicSetDatabase& relicSets);
 
 // Sec 22.4 completed-character workflow: entered finals straight into the
 // engine config with manualStats set (mutually exclusive with 22.3).

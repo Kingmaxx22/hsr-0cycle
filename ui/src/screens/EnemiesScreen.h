@@ -5,8 +5,21 @@
 #include "../data/EnemyDatabase.h"
 #include "raylib.h"
 
+#include <array>
 #include <string>
 #include <vector>
+
+// One enemy placement: instance id + mid-combat spawn clock (0 = present
+// from the start). Kept data-light; full stats resolve from EnemyDatabase
+// at encounter build time (single source of truth, Sec 22.9).
+struct SlotEntry
+{
+    std::string id;
+    int spawnAv = 0;
+    // Per-entry RES override in percent-points (-1 = Q2 auto-rule).
+    // Cycles auto -> 0 -> 20 -> 40 -> auto in the slot editor.
+    double resOverride = -1.0;
+};
 
 class EnemiesScreen : public Screen
 {
@@ -17,13 +30,17 @@ public:
         All
     };
 
+    // Exactly five encounter slots (AGENTS.md Sec 19/35); each holds
+    // zero or more entries. Empty slots are valid.
+    static constexpr int kSlotCount = 5;
+
     EnemiesScreen(AssetManager& assets, EnemyDatabase& enemies);
 
     void initialize() override;
     void update(float dt) override;
     void draw() override;
 
-    const std::string& getSelectedEnemyId() const { return selectedEnemyId; }
+    const std::array<std::vector<SlotEntry>, kSlotCount>& getSlots() const { return slots; }
     bool consumeBackRequest();
 
 private:
@@ -31,16 +48,26 @@ private:
     Rectangle searchBounds();
     Rectangle filterBounds(Filter selectedFilter);
     Rectangle rowBounds(int row);
+    Rectangle slotTabBounds(int slot);
+    Rectangle slotEntryBounds(int entryRow) const;
+    Rectangle slotEntryRemoveBounds(int entryRow) const;
+    Rectangle slotEntrySpawnMinusBounds(int entryRow) const;
+    Rectangle slotEntrySpawnPlusBounds(int entryRow) const;
+    Rectangle slotEntryResBounds(int entryRow) const;
+    Rectangle slotClearBounds() const;
 
     void rebuildFiltered();
-    void selectEnemy(const EnemyInfo& enemy);
+    void toggleSlotEntry(const EnemyInfo& enemy);
+    void drawSlotContents();
 
     AssetManager& assets;
     EnemyDatabase& enemies;
 
     std::string searchText;
-    std::string selectedEnemyId;
     Filter filter = Filter::BossElite;
+
+    std::array<std::vector<SlotEntry>, kSlotCount> slots;
+    int activeSlot = 0;
 
     std::vector<const EnemyInfo*> filtered;
     int hoveredRow = -1;

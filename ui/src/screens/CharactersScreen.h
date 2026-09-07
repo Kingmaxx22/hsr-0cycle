@@ -104,8 +104,8 @@ private:
 
     // --- Build-tab component editors (Sec 22.2) ---
     // Extra/other-bonus + base-override fields, single focus index.
-    // 0-8: other bonuses, 9-12: base HP/ATK/DEF/SPD. -1 = none focused.
-    static constexpr int kExtraFieldCount = 13;
+    // 0-9: other bonuses, 10-13: base HP/ATK/DEF/SPD. -1 = none focused.
+    static constexpr int kExtraFieldCount = 14;
     Rectangle extraFieldBounds(int index) const;
     Rectangle baseToggleBounds() const;
     Rectangle levelMinusBounds() const;
@@ -116,6 +116,15 @@ private:
     void commitExtraField(int index);
     CharacterLoadout& loadoutFor(const std::string& characterId);
     const CharacterInfo* selectedInfo() const;
+
+    // Q3: equipped conditional set effects, stable order, for opt-in toggles.
+    struct CondToggle {
+        std::string effectId;
+        std::string label;
+        bool autoActive = false; // derived from turn state (element match)
+    };
+    std::vector<CondToggle> conditionalToggles(const CharacterLoadout& lo) const;
+    Rectangle toggleRowBounds(int index) const;
 
     // Layout constants
     static constexpr int kLibraryCols = 5;
@@ -128,7 +137,7 @@ private:
     static constexpr float kLibraryOriginY = 160.0f;
     // Viewport is intentionally shorter than the full window so the
     // workflow detail section below the grid stays visible/clickable.
-    static constexpr float kViewportH = 380.0f;
+    static constexpr float kViewportH = 340.0f;
 
     // Character grid
     AssetManager& m_assets;

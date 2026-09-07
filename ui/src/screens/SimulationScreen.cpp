@@ -78,29 +78,29 @@ void SimulationScreen::initialize() {
     std::cout << "[SimulationScreen] Initialized with " << characters.size() << " character(s)" << std::endl;
 }
 
-void SimulationScreen::setSelectedEnemy(const std::string& enemyId) {
-    selectedEnemyId = enemyId;
+void SimulationScreen::setEncounter(const hsr::EncounterConfig& encounter) {
+    currentEncounter = encounter;
+    hasEncounter = true;
 
-    // Load enemy data from database
-    const EnemyInfo* enemyInfo = enemies.get(enemyId);
-    if (enemyInfo) {
-        currentEnemy.id = enemyInfo->id;
-        currentEnemy.name = enemyInfo->name;
-        currentEnemy.maxHp = static_cast<int>(enemyInfo->hp);
-        currentEnemy.currentHp = static_cast<int>(enemyInfo->hp);
-        currentEnemy.toughness = static_cast<int>(enemyInfo->toughness);
-        // Section 21.3: enemy combat state comes from the enemy system.
-        currentEnemy.level = enemyInfo->level;
-        currentEnemy.baseDef = enemyInfo->def;
-        currentEnemy.slotIndex = 0;
-        currentEnemy.spawnAv = 0;
-
-        // Get physical resistance if available, otherwise default to 0
-        auto resIt = enemyInfo->resistances.find("Physical");
-        currentEnemy.resistance = (resIt != enemyInfo->resistances.end()) ? resIt->second : 0.0f;
-
-        std::cout << "[SimulationScreen] Set enemy: " << currentEnemy.name << std::endl;
+    // Display follows the first encounter enemy (slot order).
+    bool found = false;
+    for (size_t s = 0; s < currentEncounter.slots.size() && !found; ++s) {
+        for (const auto& e : currentEncounter.slots[s]) {
+            currentEnemy = e;
+            found = true;
+            break;
+        }
     }
+    if (found)
+        std::cout << "[SimulationScreen] Set encounter: " << encounterEnemyCount()
+                  << " enemie(s), first: " << currentEnemy.name << std::endl;
+}
+
+size_t SimulationScreen::encounterEnemyCount() const {
+    size_t count = 0;
+    for (const auto& slot : currentEncounter.slots)
+        count += slot.size();
+    return count;
 }
 
 void SimulationScreen::addCharacter(const hsr::CharacterConfig& config) {
@@ -141,8 +141,8 @@ void SimulationScreen::runSimulation() {
         return;
     }
 
-    if (selectedEnemyId.empty()) {
-        std::cerr << "[SimulationScreen] No enemy selected!" << std::endl;
+    if (!hasEncounter || encounterEnemyCount() == 0) {
+        std::cerr << "[SimulationScreen] No encounter configured!" << std::endl;
         return;
     }
 
@@ -151,11 +151,11 @@ void SimulationScreen::runSimulation() {
 
     std::cout << "[SimulationScreen] Running simulation with "
               << characters.size() << " character(s) against "
-              << currentEnemy.name << std::endl;
+              << encounterEnemyCount() << " enemie(s)" << std::endl;
 
     // Run simulation using C++ engine (Python bridge would be used if implemented)
     hsr::SimulationEngine engine;
-    lastResult = engine.runSimulation(characters, currentEnemy, 15000);
+    lastResult = engine.runSimulation(characters, currentEncounter, 15000);
 
     isRunning = false;
     showResults = true;
@@ -257,6 +257,9 @@ void SimulationScreen::draw() {
     DrawText("0-Cycle Simulation", headerBounds().x + 10, headerBounds().y + 20, 24, WHITE);
 
     std::string enemyText = "Enemy: " + (currentEnemy.name.empty() ? "None Selected" : currentEnemy.name);
+    size_t foeCount = encounterEnemyCount();
+    if (foeCount > 1)
+        enemyText += " (+" + std::to_string(foeCount - 1) + " more)";
     DrawText(enemyText.c_str(), headerBounds().x + 10, headerBounds().y + 45, 16, LIGHTGRAY);
 
     std::string engineText = usePythonEngine ? "Engine: Python" : "Engine: C++";
