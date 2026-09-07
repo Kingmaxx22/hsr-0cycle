@@ -44,3 +44,7 @@ htmlcov/
 dist/
 *.tar.gz
 *.zip
+
+# Python cache
+__pycache__/
+*.pyc
