@@ -165,6 +165,15 @@ bool CharacterDatabase::load(const std::string& dataDir)
         if (traceIt != tracesBySlug.end())
             info.traces = traceIt->second;
 
+        // Phase 4.4: Technique preamble (display only).
+        if (const auto* tech = skillDb.techniqueFor(info.id))
+        {
+            info.technique.slot = "Tech";
+            info.technique.name = tech->name;
+            info.technique.description = tech->description;
+            info.hasTechnique = true;
+        }
+
         idIndex[info.id] = characters.size();
         characters.push_back(std::move(info));
     }

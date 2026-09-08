@@ -119,6 +119,20 @@ bool SkillDatabase::load(const std::string& dataDir)
         if (slug.empty() || desc.empty())
             continue;
 
+        // Phase 4.4: Techniques are stored for display only (pre-combat
+        // preamble, free-form mechanics). One per slug.
+        if (skillType == "Technique")
+        {
+            if (techniques.find(slug) == techniques.end())
+            {
+                TechniqueInfo info;
+                info.name = raw.value("skill_name", "Technique");
+                info.description = desc;
+                techniques[slug] = std::move(info);
+            }
+            continue;
+        }
+
         // Map data skill_type -> engine action key.
         std::string action;
         if (skillType == "Basic ATK") action = "basic";
@@ -173,4 +187,13 @@ const std::unordered_map<std::string, ParsedSkillData>& SkillDatabase::skillsFor
     if (it == bySlug.end())
         return empty;
     return it->second;
+}
+
+const SkillDatabase::TechniqueInfo* SkillDatabase::techniqueFor(
+    const std::string& slug) const
+{
+    auto it = techniques.find(slug);
+    if (it == techniques.end())
+        return nullptr;
+    return &it->second;
 }

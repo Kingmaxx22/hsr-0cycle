@@ -822,6 +822,21 @@ void CharactersScreen::draw()
                     DrawText(desc.c_str(), static_cast<int>(row.x + 22),
                              static_cast<int>(row.y + 21), 11, GRAY);
                 }
+                // Phase 4.4: Technique preamble, read-only (no toggle: its
+                // free-form pre-combat mechanics are not auto-resolved).
+                if (traceInfo->hasTechnique)
+                {
+                    float techY = traceRowBounds(static_cast<int>(traceShown) - 1,
+                                                 static_cast<int>(shown)).y + 42.0f;
+                    std::string techLabel = "TECH " + traceInfo->technique.name;
+                    if (techLabel.size() > 48)
+                        techLabel = techLabel.substr(0, 45) + "...";
+                    DrawText(techLabel.c_str(), 332, static_cast<int>(techY), 13, LIGHTGRAY);
+                    std::string techDesc = traceInfo->technique.description;
+                    if (techDesc.size() > 64)
+                        techDesc = techDesc.substr(0, 61) + "...";
+                    DrawText(techDesc.c_str(), 332, static_cast<int>(techY + 18), 11, GRAY);
+                }
             }
 
             // --- Right column: other bonuses / base override / level ---

@@ -40,6 +40,10 @@ struct CharacterInfo
     std::unordered_map<std::string, double> baseStats;
     std::unordered_map<std::string, SkillTuning> skills; // keys: basic/skill/ult/fua/memosprite
     std::vector<MajorTrace> traces; // A2/A4/A6, file order (Phase 2)
+    // Phase 4.4: Technique preamble description (display only; exactly one
+    // per character when the skill file carries it).
+    MajorTrace technique;
+    bool hasTechnique = false;
 };
 
 class CharacterDatabase

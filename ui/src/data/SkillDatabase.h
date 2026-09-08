@@ -32,8 +32,19 @@ public:
     const std::unordered_map<std::string, ParsedSkillData>& skillsFor(
         const std::string& slug) const;
 
+    // Phase 4.4: Technique description per slug (at most one each).
+    // Pre-combat preamble with free-form mechanics: parsed and stored for
+    // display only, never auto-resolved into combat effects.
+    struct TechniqueInfo
+    {
+        std::string name;
+        std::string description;
+    };
+    const TechniqueInfo* techniqueFor(const std::string& slug) const;
+
 private:
     // slug -> (action key -> parsed data)
     std::unordered_map<std::string,
         std::unordered_map<std::string, ParsedSkillData>> bySlug;
+    std::unordered_map<std::string, TechniqueInfo> techniques;
 };

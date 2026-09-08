@@ -52,6 +52,16 @@ int main()
 
     // Unknown slug: empty, no crash.
     CHECK(db.skillsFor("no-such-character").empty());
+    CHECK(db.techniqueFor("no-such-character") == nullptr);
+
+    // Phase 4.4: Techniques stored per slug (display only).
+    const auto* tech = db.techniqueFor("acheron");
+    CHECK(tech != nullptr);
+    if (tech != nullptr)
+    {
+        CHECK(tech->name == "Quadrivalent Ascendance");
+        CHECK(!tech->description.empty());
+    }
 
     // At least one AoE and one Bounce skill parsed across the file.
     // (Spot-check via known AoE: castorice memosprite AoE.)
