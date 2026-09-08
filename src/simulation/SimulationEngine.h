@@ -88,6 +88,7 @@ struct CharacterConfig {
     double lightConeBaseHp = 0.0;
     double lightConeBaseAtk = 0.0;
     double lightConeBaseDef = 0.0;
+    int lightConeSuperimposition = 1; // S1..S5, consumed for passive scaling
 
     // Whether stats were manually entered (bypass component building workflow)
     bool manualStats = false;

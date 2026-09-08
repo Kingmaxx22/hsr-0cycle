@@ -320,6 +320,7 @@ void applyToCharacterConfig(hsr::CharacterConfig& config,
     config.lightConeBaseHp = lcHp;
     config.lightConeBaseAtk = lcAtk;
     config.lightConeBaseDef = lcDef;
+    config.lightConeSuperimposition = loadout.lightConeSuperimposition;
 
     ResolvedBonuses b = resolveGearBonuses(loadout);
     mergeBonuses(b, resolveSetBonuses(loadout, relicSets, info.element));
