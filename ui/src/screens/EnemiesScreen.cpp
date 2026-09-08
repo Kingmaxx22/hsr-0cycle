@@ -694,7 +694,6 @@ void EnemiesScreen::draw()
             14,
             armed ? RAYWHITE : kDimText);
     }
-    }
 
 
 
