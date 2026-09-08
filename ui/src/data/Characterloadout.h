@@ -89,6 +89,23 @@ struct CharacterLoadout
     std::unordered_map<std::string, bool> traceActive;
     bool lcPassiveActive = false;
 
+    // Phase 3: Eidolon level (0..6, default 0). Selects boosted manual
+    // scaling values data-driven via the eidolon skillLevels lists, and
+    // annotates non-skill Eidolons as informational notes.
+    int eidolonLevel = 0;
+
+    // Manual damage tables ("#1[i]%" values, decimals: 2.60 = 260%).
+    // Per engine action key (basic/skill/ult/fua/memosprite): the base
+    // multiplier and the Eidolon-boosted multiplier. The boosted value
+    // applies when eidolonLevel reaches the E-number whose skillLevels
+    // list the action (data-driven, varies per character).
+    struct ScalingEntry
+    {
+        double base = 0.0;    // 0 = fall back to engine multipliers
+        double boosted = 0.0; // 0 = no boosted value entered
+    };
+    std::unordered_map<std::string, ScalingEntry> scalingTables;
+
     bool initialized = false;
 };
 

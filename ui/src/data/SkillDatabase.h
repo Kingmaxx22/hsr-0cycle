@@ -42,9 +42,16 @@ public:
     };
     const TechniqueInfo* techniqueFor(const std::string& slug) const;
 
+    // DoT base chances (dot_base_chance.csv, hsr-optimizer extraction):
+    // slug -> base chance (0..1). Only literal rows are stored;
+    // computed rows (Black Swan, Guinaifen `dotChance` variables) are
+    // skipped with a note — never guessed. Missing slug = no kit DoT.
+    double dotChanceFor(const std::string& slug) const;
+
 private:
     // slug -> (action key -> parsed data)
     std::unordered_map<std::string,
         std::unordered_map<std::string, ParsedSkillData>> bySlug;
     std::unordered_map<std::string, TechniqueInfo> techniques;
+    std::unordered_map<std::string, double> dotChances;
 };

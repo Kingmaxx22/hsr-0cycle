@@ -36,6 +36,16 @@ hsr_add_test(test_bars
     ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
 )
 
+# Phase 3: Eidolon rules, E-gated scaling, DoT base-chance defaults.
+hsr_add_test(test_eidolons
+    test_eidolons.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/CharacterDatabase.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/SkillDatabase.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/LightConeDatabase.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/Relicsetdatabase.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/LoadoutResolver.cpp
+)
+
 # Phase 4.2: break-DoT application and ticking.
 hsr_add_test(test_dots
     test_dots.cpp

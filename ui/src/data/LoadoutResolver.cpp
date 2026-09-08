@@ -366,6 +366,10 @@ void applyToCharacterConfig(hsr::CharacterConfig& config,
     config.ehr = b.ehr;
     config.effectRes = b.effectRes;
     config.breakDmgIncrease = b.breakDmgIncrease;
+    // DoT base-chance default from dot_base_chance.csv. The DoT still
+    // needs a user-configured type/turns/scale to fire (Sec 13 gate).
+    if (info.dotBaseChance > 0.0)
+        config.breakDotChance = info.dotBaseChance;
     // Q1 store-only: resolved for display/debug, not consumed by calcs yet.
     config.breakEffect = b.breakEffect;
     config.outgoingHealingBoost = b.healingBoost;
@@ -386,6 +390,59 @@ void applyToCharacterConfig(hsr::CharacterConfig& config,
         const LightConeInfo* lc = lightCones.getById(loadout.lightConeId);
         std::string lcName = (lc != nullptr) ? lc->name : loadout.lightConeId;
         config.passiveNotes.push_back("LC passive " + lcName + ": ON");
+    }
+
+    // Phase 3: Eidolons. Skill-raising Eidolons select boosted manual
+    // scaling values data-driven (min E-number listing the action); all
+    // other unlocked Eidolons travel as informational notes only.
+    const int eidolonLevel = std::max(0, std::min(6, loadout.eidolonLevel));
+    auto engineActionToAbility = [](const std::string& action) -> std::string {
+        if (action == "basic") return "Basic ATK";
+        if (action == "skill") return "Skill";
+        if (action == "ult") return "Ultimate";
+        if (action == "fua") return "Talent";
+        if (action == "memosprite") return "Memosprite Skill";
+        return "";
+    };
+    for (const auto& kv : loadout.scalingTables)
+    {
+        const std::string ability = engineActionToAbility(kv.first);
+        if (ability.empty())
+            continue;
+        // Min unlocked-or-not E-number raising this action (0 = none).
+        int requiredE = 0;
+        for (const auto& eidolon : info.eidolons)
+        {
+            for (const auto& skill : eidolon.skillLevels)
+            {
+                if (skill == ability &&
+                    (requiredE == 0 || eidolon.eidolon < requiredE))
+                    requiredE = eidolon.eidolon;
+            }
+        }
+        double value = kv.second.base;
+        if (kv.second.boosted > 0.0 && requiredE > 0 && eidolonLevel >= requiredE)
+            value = kv.second.boosted;
+        if (value <= 0.0)
+            continue;
+        std::string engineAction;
+        if (kv.first == "basic") engineAction = "Basic";
+        else if (kv.first == "skill") engineAction = "Skill";
+        else if (kv.first == "ult") engineAction = "Ult";
+        else if (kv.first == "fua") engineAction = "FUA";
+        else if (kv.first == "memosprite") engineAction = "Memosprite";
+        else continue;
+        // Manual tables win over parsed data (explicit user entry).
+        config.skillActions[engineAction].damageMultiplier = value;
+    }
+    for (const auto& eidolon : info.eidolons)
+    {
+        if (eidolon.eidolon > eidolonLevel)
+            continue;
+        if (!eidolon.skillLevels.empty())
+            continue; // skill raises act through scaling selection above
+        config.passiveNotes.push_back("E" + std::to_string(eidolon.eidolon) +
+                                      " " + eidolon.title + ": ON");
     }
 }
 

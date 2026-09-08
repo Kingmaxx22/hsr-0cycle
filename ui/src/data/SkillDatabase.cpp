@@ -4,6 +4,9 @@
 #include <cstdio>
 #include <fstream>
 #include <regex>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 using json = nlohmann::json;
 
@@ -82,6 +85,84 @@ std::string parseScaling(const std::string& desc)
     return "atk";
 }
 
+// character_file (optimizer) -> rules slug: strip B-suffix variants
+// (KafkaB1 -> kafka), split CamelCase (BlackSwan -> black-swan).
+std::string normalizeDotSlug(const std::string& file)
+{
+    std::string base = file;
+    if (base.size() > 2 && base.back() == '1' &&
+        (base[base.size() - 2] == 'B' || base[base.size() - 2] == 'b'))
+        base = base.substr(0, base.size() - 2);
+    std::string out;
+    for (size_t i = 0; i < base.size(); ++i)
+    {
+        char c = base[i];
+        if (c >= 'A' && c <= 'Z')
+        {
+            if (i > 0)
+                out.push_back('-');
+            out.push_back(static_cast<char>(c - 'A' + 'a'));
+        }
+        else
+            out.push_back(c);
+    }
+    return out;
+}
+
+void loadDotChances(const std::string& dataDir,
+                    std::unordered_map<std::string, double>& out)
+{
+    std::ifstream file(dataDir + "/dot_base_chance.csv");
+    if (!file)
+        return; // Best-effort: missing file means no DoT defaults.
+    std::string header;
+    if (!std::getline(file, header))
+        return;
+    if (header.size() >= 3 &&
+        static_cast<unsigned char>(header[0]) == 0xEF)
+        header = header.substr(3);
+    // Columns: character_file,path_id,dot_base_chance,raw_expr,literal
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line.empty())
+            continue;
+        // No quoted commas in this export: plain split is safe.
+        std::vector<std::string> cols;
+        std::string cur;
+        for (char c : line)
+        {
+            if (c == ',')
+            {
+                cols.push_back(cur);
+                cur.clear();
+            }
+            else
+                cur.push_back(c);
+        }
+        cols.push_back(cur);
+        if (cols.size() < 5)
+            continue;
+        if (cols[4] != "True")
+            continue; // Computed `dotChance` variables: skipped, not guessed.
+        try
+        {
+            double chance = std::stod(cols[2]);
+            if (chance < 0.0 || chance > 1.0)
+                continue;
+            std::string slug = normalizeDotSlug(cols[0]);
+            // Max wins across duplicate rows (Hysilens x5 identical 1.0).
+            auto it = out.find(slug);
+            if (it == out.end() || chance > it->second)
+                out[slug] = chance;
+        }
+        catch (...)
+        {
+            continue;
+        }
+    }
+}
+
 } // namespace
 
 bool SkillDatabase::load(const std::string& dataDir)
@@ -106,6 +187,10 @@ bool SkillDatabase::load(const std::string& dataDir)
         return false;
 
     bySlug.clear();
+
+    // DoT base chances ride along (same dataDir, independent file).
+    dotChances.clear();
+    loadDotChances(dataDir, dotChances);
 
     for (const auto& entry : root["skills"])
     {
@@ -196,4 +281,12 @@ const SkillDatabase::TechniqueInfo* SkillDatabase::techniqueFor(
     if (it == techniques.end())
         return nullptr;
     return &it->second;
+}
+
+double SkillDatabase::dotChanceFor(const std::string& slug) const
+{
+    auto it = dotChances.find(slug);
+    if (it == dotChances.end())
+        return 0.0;
+    return it->second;
 }

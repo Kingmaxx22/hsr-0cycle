@@ -30,6 +30,19 @@ struct MajorTrace
     std::string description;
 };
 
+// Eidolon level (Phase 3): parsed from character_eidolons_rules.json
+// (generated from character_eidolons.csv). skillLevels lists the abilities
+// this Eidolon raises ("Skill Lv. +2" style) — used data-driven to select
+// boosted manual scaling values. All other mechanics travel as
+// informational notes only (§29, no auto-resolution).
+struct EidolonLevel
+{
+    int eidolon = 0;        // 1..6
+    std::string title;
+    std::string description;
+    std::vector<std::string> skillLevels; // e.g. {"Ultimate", "Basic ATK"}
+};
+
 struct CharacterInfo
 {
     std::string id;        // "acheron" - used for both rules lookup and artwork
@@ -44,6 +57,13 @@ struct CharacterInfo
     // per character when the skill file carries it).
     MajorTrace technique;
     bool hasTechnique = false;
+    // Phase 3: Eidolon levels, ascending (empty when the rules file
+    // lacks this slug — engine fallbacks apply).
+    std::vector<EidolonLevel> eidolons;
+    // DoT base chance default from dot_base_chance.csv (0 = no kit DoT).
+    // Feeds CharacterConfig.breakDotChance; the DoT type/turns/scale stay
+    // user-configured (tryApplyBreakDot needs all of them).
+    double dotBaseChance = 0.0;
 };
 
 class CharacterDatabase

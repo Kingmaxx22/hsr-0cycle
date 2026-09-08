@@ -48,6 +48,52 @@ bool CharacterDatabase::load(const std::string& dataDir)
     SkillDatabase skillDb;
     const bool haveSkills = skillDb.load(dataDir);
 
+    // Phase 3: Eidolon levels, loaded once and attached by slug.
+    // Best-effort: missing file leaves empty eidolon lists.
+    std::unordered_map<std::string, std::vector<EidolonLevel>> eidolonsBySlug;
+    {
+        std::ifstream eidolonFile(dataDir + "/character_eidolons_rules.json");
+        if (eidolonFile)
+        {
+            try
+            {
+                json eidolonRoot;
+                eidolonFile >> eidolonRoot;
+                if (eidolonRoot.contains("eidolons") && eidolonRoot["eidolons"].is_array())
+                {
+                    for (const auto& entry : eidolonRoot["eidolons"])
+                    {
+                        std::string slug = entry.value("slug", "");
+                        if (slug.empty() || !entry.contains("levels"))
+                            continue;
+                        std::vector<EidolonLevel> levels;
+                        for (const auto& lv : entry["levels"])
+                        {
+                            EidolonLevel level;
+                            level.eidolon = lv.value("eidolon", 0);
+                            level.title = lv.value("title", "");
+                            level.description = lv.value("description", "");
+                            if (lv.contains("skillLevels") && lv["skillLevels"].is_array())
+                            {
+                                for (const auto& skill : lv["skillLevels"])
+                                {
+                                    if (skill.is_string())
+                                        level.skillLevels.push_back(skill.get<std::string>());
+                                }
+                            }
+                            if (level.eidolon >= 1 && level.eidolon <= 6)
+                                levels.push_back(std::move(level));
+                        }
+                        eidolonsBySlug[slug] = std::move(levels);
+                    }
+                }
+            }
+            catch (const json::parse_error& e)
+            {
+                fprintf(stderr, "Failed to parse eidolons: %s\n", e.what());
+            }
+        }
+    }
     // Phase 2: major-trace passives, loaded once and attached by slug.
     // Best-effort: missing file leaves empty trace lists.
     std::unordered_map<std::string, std::vector<MajorTrace>> tracesBySlug;
@@ -165,6 +211,11 @@ bool CharacterDatabase::load(const std::string& dataDir)
         if (traceIt != tracesBySlug.end())
             info.traces = traceIt->second;
 
+        // Phase 3: Eidolon levels by slug (best-effort).
+        auto eidolonIt = eidolonsBySlug.find(info.id);
+        if (eidolonIt != eidolonsBySlug.end())
+            info.eidolons = eidolonIt->second;
+
         // Phase 4.4: Technique preamble (display only).
         if (const auto* tech = skillDb.techniqueFor(info.id))
         {
@@ -173,6 +224,9 @@ bool CharacterDatabase::load(const std::string& dataDir)
             info.technique.description = tech->description;
             info.hasTechnique = true;
         }
+
+        // DoT base-chance default (0 when the CSV has no literal row).
+        info.dotBaseChance = skillDb.dotChanceFor(info.id);
 
         idIndex[info.id] = characters.size();
         characters.push_back(std::move(info));
