@@ -98,6 +98,13 @@ hsr_add_test(test_e2e
     ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
 )
 
+# Milestone 0.1: golden single-hit damage through every formula stage.
+hsr_add_test(test_damage
+    test_damage.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)
+
 # Sequential wave slots: later entries activate on earlier deaths.
 hsr_add_test(test_waves
     test_waves.cpp
