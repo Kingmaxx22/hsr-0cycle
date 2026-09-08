@@ -70,6 +70,51 @@ Rectangle CharactersScreen::dotFieldBounds(int index) const
     return Rectangle{x, top, 200.0f, 28.0f};
 }
 
+Rectangle CharactersScreen::detailRegion() const
+{
+    // Detail content lives below the grid; the bottom selection prompt
+    // owns y 850+, so the scrollable window ends at 845.
+    return Rectangle{300.0f, 520.0f, 1140.0f, 325.0f};
+}
+
+float CharactersScreen::detailMaxScroll()
+{
+    // Manual tab fits the window; only the build tab scrolls.
+    float bottom = 850.0f;
+    if (!m_manualStatsMode && selectedInfo() != nullptr)
+    {
+        const CharacterInfo* info = selectedInfo();
+        CharacterLoadout& lo = loadoutFor(info->id);
+        auto toggles = conditionalToggles(lo);
+        size_t shown = std::min(toggles.size(), static_cast<size_t>(3));
+        size_t traceShown =
+            std::min(info->traces.size(), static_cast<size_t>(3));
+        float traceBottom;
+        if (traceShown > 0)
+        {
+            traceBottom =
+                traceRowBounds(static_cast<int>(traceShown) - 1,
+                               static_cast<int>(shown)).y + 38.0f;
+            if (info->hasTechnique)
+                traceBottom += 42.0f + 36.0f;
+        }
+        else
+        {
+            traceBottom = 780.0f + shown * 24.0f + 28.0f;
+        }
+        auto declRows = scalingDeclRows();
+        float scalingBottom = 0.0f;
+        if (!declRows.empty())
+        {
+            size_t ds = std::min(declRows.size(),
+                                 static_cast<size_t>(kScalingMaxRows));
+            scalingBottom = 810.0f + ds * 28.0f + 30.0f;
+        }
+        bottom = std::max({bottom, traceBottom, scalingBottom});
+    }
+    return std::max(0.0f, bottom - 838.0f);
+}
+
 Rectangle CharactersScreen::extraFieldBounds(int index) const
 {
     // Other bonuses: 5 cols x 2 rows at right; base override: 4-in-a-row.
@@ -535,12 +580,24 @@ void CharactersScreen::update(float dt)
     // Build tab
     m_buildTabHover = CheckCollisionPointRec(mouse, m_buildTabBounds);
     if (m_buildTabHover && clicked)
+    {
         m_manualStatsMode = false;
+        m_detailScroll = 0.0f;
+    }
 
     // Manual tab
     m_manualTabHover = CheckCollisionPointRec(mouse, m_manualTabBounds);
     if (m_manualTabHover && clicked)
+    {
         m_manualStatsMode = true;
+        m_detailScroll = 0.0f;
+    }
+
+    // Detail-area mouse: content below the grid scrolls, so hit-tests
+    // there use scroll-adjusted coordinates (grid/tabs stay raw).
+    Vector2 dmouse = mouse;
+    if (mouse.y >= manualContentTop())
+        dmouse.y += m_detailScroll;
 
     // Manual stat field focus (click to focus, click elsewhere to commit)
     if (m_manualStatsMode && clicked)
@@ -548,7 +605,7 @@ void CharactersScreen::update(float dt)
         int hitField = -1;
         for (int i = 0; i < kManualFieldCount; ++i)
         {
-            if (CheckCollisionPointRec(mouse, manualFieldBounds(i)))
+            if (CheckCollisionPointRec(dmouse, manualFieldBounds(i)))
             {
                 hitField = i;
                 break;
@@ -569,7 +626,7 @@ void CharactersScreen::update(float dt)
         int hitDot = -1;
         for (int i = 0; i < kDotFieldCount; ++i)
         {
-            if (CheckCollisionPointRec(mouse, dotFieldBounds(i)))
+            if (CheckCollisionPointRec(dmouse, dotFieldBounds(i)))
             {
                 hitDot = i;
                 break;
@@ -602,7 +659,7 @@ void CharactersScreen::update(float dt)
                 // Base fields are inert unless the override is enabled.
                 if (i >= 10 && !lo.manualBase.useOverride)
                     continue;
-                if (CheckCollisionPointRec(mouse, extraFieldBounds(i)))
+                if (CheckCollisionPointRec(dmouse, extraFieldBounds(i)))
                 {
                     if (m_focusedExtraField >= 0)
                         commitExtraField(m_focusedExtraField);
@@ -623,7 +680,7 @@ void CharactersScreen::update(float dt)
             }
             if (!hitSomething)
             {
-                if (CheckCollisionPointRec(mouse, baseToggleBounds()))
+                if (CheckCollisionPointRec(dmouse, baseToggleBounds()))
                 {
                     lo.manualBase.useOverride = !lo.manualBase.useOverride;
                     if (lo.manualBase.useOverride)
@@ -641,11 +698,11 @@ void CharactersScreen::update(float dt)
                         lo.manualBase.spd = base("spd");
                     }
                 }
-                else if (CheckCollisionPointRec(mouse, levelMinusBounds()))
+                else if (CheckCollisionPointRec(dmouse, levelMinusBounds()))
                 {
                     lo.level = std::max(1, lo.level - 1);
                 }
-                else if (CheckCollisionPointRec(mouse, levelPlusBounds()))
+                else if (CheckCollisionPointRec(dmouse, levelPlusBounds()))
                 {
                     lo.level = std::min(90, lo.level + 1);
                 }
@@ -657,7 +714,7 @@ void CharactersScreen::update(float dt)
                     bool rowHit = false;
                     for (size_t ti = 0; ti < shown; ++ti)
                     {
-                        if (CheckCollisionPointRec(mouse, toggleRowBounds(static_cast<int>(ti))))
+                        if (CheckCollisionPointRec(dmouse, toggleRowBounds(static_cast<int>(ti))))
                         {
                             // Auto-derived effects need no click; manual ones
                             // flip the opt-in (inserting false = stays OFF).
@@ -679,7 +736,7 @@ void CharactersScreen::update(float dt)
                         for (size_t ti = 0; ti < traceShown; ++ti)
                         {
                             if (CheckCollisionPointRec(
-                                    mouse, traceRowBounds(static_cast<int>(ti),
+                                    dmouse, traceRowBounds(static_cast<int>(ti),
                                                           static_cast<int>(shown))))
                             {
                                 bool& active = lo.traceActive[traces[ti].slot];
@@ -693,7 +750,7 @@ void CharactersScreen::update(float dt)
                     for (size_t sf = 0; sf < scalingCount; ++sf)
                     {
                         int field = kScalingFieldBase + static_cast<int>(sf);
-                        if (CheckCollisionPointRec(mouse, scalingFieldBounds(field)))
+                        if (CheckCollisionPointRec(dmouse, scalingFieldBounds(field)))
                         {
                             if (m_focusedScalingField >= 0)
                                 commitScalingField(m_focusedScalingField);
@@ -884,6 +941,14 @@ void CharactersScreen::update(float dt)
         m_scroll = std::clamp(m_scroll, 0.0f, maxScroll);
     }
 
+    // Detail region scroll (build tab overflows the window height).
+    Rectangle detailWheel = detailRegion();
+    if (CheckCollisionPointRec(mouse, detailWheel))
+    {
+        m_detailScroll -= GetMouseWheelMove() * 40.0f;
+        m_detailScroll = std::clamp(m_detailScroll, 0.0f, detailMaxScroll());
+    }
+
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
     {
         if (!m_searchQuery.empty() && CheckCollisionPointRec(mouse, searchClearButtonBounds()))
@@ -908,6 +973,7 @@ void CharactersScreen::update(float dt)
                 if (CheckCollisionPointRec(mouse, r))
                 {
                     m_selectedCharacterId = m_filteredRoster[i]->id;
+                    m_detailScroll = 0.0f;
                     syncManualCharacterId();
                     m_pendingSelection = true;
                     // Prefill damage tables from the extraction once;
@@ -1031,6 +1097,20 @@ void CharactersScreen::draw()
 
     // --- Mode-specific content ---
     float modeContentY = manualContentTop();
+
+    // Detail region: clipped to the window above the footer prompt and
+    // shifted by the detail scroll (build tab overflows 900px).
+    Rectangle detailClip = detailRegion();
+    BeginScissorMode(static_cast<int>(detailClip.x),
+                     static_cast<int>(detailClip.y),
+                     static_cast<int>(detailClip.width),
+                     static_cast<int>(detailClip.height));
+    Camera2D detailCam{};
+    detailCam.offset = {detailClip.x, detailClip.y};
+    detailCam.target = {detailClip.x, detailClip.y + m_detailScroll};
+    detailCam.rotation = 0.0f;
+    detailCam.zoom = 1.0f;
+    BeginMode2D(detailCam);
 
     if (!m_manualStatsMode) {
         // --- BUILD FROM COMPONENTS WORKFLOW (Sec 22.2/22.3) ---
@@ -1372,6 +1452,11 @@ void CharactersScreen::draw()
                      m_dotTexts[static_cast<size_t>(i)].empty() && !focused ? GRAY : RAYWHITE);
         }
     }
+
+    // Paired with the detail BeginScissorMode/BeginMode2D above: the
+    // scroll must never leak into the footer prompt or other screens.
+    EndMode2D();
+    EndScissorMode();
 
     // --- Selection prompt (input itself is handled in update()) ---
     DrawText("Click a portrait or press ENTER to select, ESC to return", 310, GetScreenHeight() - 50, 16, GRAY);

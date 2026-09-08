@@ -104,6 +104,9 @@ private:
     Rectangle searchClearButtonBounds() const;
     Rectangle manualFieldBounds(int index) const;
     Rectangle dotFieldBounds(int index) const;
+    // Detail region below the grid (clipped + scrollable in draw/update).
+    Rectangle detailRegion() const;
+    float detailMaxScroll();
     float manualContentTop() const;
     static int parseStatText(const std::string& text);
     static double parsePercentText(const std::string& text);
@@ -161,6 +164,9 @@ private:
     std::string m_searchQuery;
     std::vector<const CharacterInfo*> m_filteredRoster;
     float m_scroll = 0.0f;
+    // Vertical scroll of the detail region below the grid (build tab
+    // overflows the 900px window: traces + technique + damage tables).
+    float m_detailScroll = 0.0f;
 
     // Workflow mode: false = build from components, true = enter completed
     bool m_manualStatsMode = false;
