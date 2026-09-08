@@ -375,8 +375,34 @@ void applyToCharacterConfig(hsr::CharacterConfig& config,
     config.outgoingHealingBoost = b.healingBoost;
     config.energyRegen = b.energyRegen;
 
-    // Phase 2: manually enabled passives travel as informational notes
-    // (§29: no numeric effect inferred). Trace names come from the DB.
+    // scalingStat: parsed per action (SkillDatabase::parseScaling), but the
+    // engine holds one per character. Majority vote across DB-tuned actions;
+    // ties break toward Skill > Basic > Ult > FUA > Memosprite. Absent data
+    // keeps the "atk" default (never guessed per-action).
+    {
+        const char* dbKeys[5] = {"skill", "basic", "ult", "fua", "memosprite"};
+        std::string pick;
+        int bestCount = 0;
+        for (int i = 0; i < 5; ++i)
+        {
+            auto it = info.skills.find(dbKeys[i]);
+            if (it == info.skills.end() || it->second.scalingStat.empty())
+                continue;
+            int count = 0;
+            for (const auto& kv : info.skills)
+            {
+                if (kv.second.scalingStat == it->second.scalingStat)
+                    ++count;
+            }
+            if (count > bestCount)
+            {
+                bestCount = count;
+                pick = it->second.scalingStat;
+            }
+        }
+        if (!pick.empty() && pick != "atk")
+            config.scalingStat = pick;
+    }
     config.passiveNotes.clear();
     for (const auto& trace : info.traces)
     {

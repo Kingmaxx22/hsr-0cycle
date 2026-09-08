@@ -79,6 +79,26 @@ int main()
         CHECK(hasLc);
     }
 
+    // scalingStat handoff: HP-scaling kits resolve "hp", ATK kits stay "atk".
+    const CharacterInfo* castorice = characters.get("castorice");
+    CHECK(castorice != nullptr);
+    if (castorice != nullptr)
+    {
+        CharacterLoadout emptyLo;
+        hsr::CharacterConfig castoriceConfig;
+        loadout::applyToCharacterConfig(castoriceConfig, *castorice, emptyLo,
+                                        lightCones, relicSets);
+        CHECK(castoriceConfig.scalingStat == "hp");
+    }
+    if (acheron != nullptr)
+    {
+        CharacterLoadout emptyLo;
+        hsr::CharacterConfig acheronConfig;
+        loadout::applyToCharacterConfig(acheronConfig, *acheron, emptyLo,
+                                        lightCones, relicSets);
+        CHECK(acheronConfig.scalingStat == "atk");
+    }
+
     if (failures == 0)
         std::printf("test_passives: all checks passed\n");
     return failures == 0 ? 0 : 1;
