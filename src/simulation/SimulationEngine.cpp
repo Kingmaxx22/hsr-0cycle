@@ -291,7 +291,11 @@ void SimulationEngine::tryApplyBreakDot(const CharacterConfig& c,
     double chance = damage::calculateEffectHitRate(
         std::clamp(c.breakDotChance, 0.0, 1.0), target.config.effectRes,
         std::max(0.0, c.ehr), 1);
-    double roll = std::uniform_real_distribution<double>(0.0, 1.0)(m_rng);
+    // Milestone 0.2: no-RNG analysis mode resolves against a fixed roll
+    // of 0.0 (applies iff final chance > 0) without consuming the stream.
+    double roll = m_noRng
+        ? 0.0
+        : std::uniform_real_distribution<double>(0.0, 1.0)(m_rng);
     if (roll >= chance)
         return; // Resisted.
     EnemyState::ActiveDot dot;
@@ -741,6 +745,10 @@ SimulationResult SimulationEngine::runSimulation(
     result.totalDamage = 0.0f;
     result.totalBreakDamage = 0.0f;
     result.isZeroCycleClear = false;
+    // Milestone 0.2: every run reseeds from the configured seed, so the
+    // same engine + seed replays bit-identically, run after run.
+    m_rng.seed(m_seed);
+    result.rngSeed = m_seed;
 
     if (characters.empty()) {
         result.errorMessage = "No characters provided";

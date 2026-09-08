@@ -105,6 +105,13 @@ hsr_add_test(test_damage
     ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
 )
 
+# Milestone 0.2: seeded deterministic replay + no-RNG analysis mode.
+hsr_add_test(test_rng
+    test_rng.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)
+
 # Sequential wave slots: later entries activate on earlier deaths.
 hsr_add_test(test_waves
     test_waves.cpp

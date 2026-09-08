@@ -127,4 +127,45 @@ inline hsr::EncounterConfig singleEncounter(const hsr::EnemyConfig& foe)
     return enc;
 }
 
+// Break-DoT attacker: one Skill breaks a 20-toughness foe and rolls the
+// configured base chance (Burn, 2 ticks, ATK-scaled).
+inline hsr::CharacterConfig dotBreaker(double baseChance)
+{
+    hsr::CharacterConfig c;
+    c.id = "dotter";
+    c.name = "dotter";
+    c.manualStats = true;
+    c.speed = 200;
+    c.finalAtk = 3000.0;
+    c.finalHp = 20000.0;
+    c.finalDef = 1000.0;
+    c.level = 80;
+    c.element = "Fire";
+    c.scalingStat = "atk";
+    c.skillMultiplier = 1.0;
+    c.rotation = {"Skill"};
+    c.breakDotType = "Burn";
+    c.breakDotChance = baseChance;
+    c.breakDotTurns = 2;
+    c.breakDotAtkScale = 1.0;
+    return c;
+}
+
+// Thin foe: one 20-toughness Skill breaks it; slow, so it ticks after.
+inline hsr::EnemyConfig thinFoe()
+{
+    hsr::EnemyConfig e;
+    e.id = "foe";
+    e.name = "foe";
+    e.maxHp = 500000;
+    e.currentHp = 500000;
+    e.toughness = 20;
+    e.level = 80;
+    e.baseDef = 500.0;
+    e.spd = 50.0;
+    e.slotIndex = 0;
+    e.effectRes = 0.0;
+    return e;
+}
+
 } // namespace hsrtest

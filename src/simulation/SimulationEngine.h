@@ -4,6 +4,7 @@
 #include "DamageCalculator.h"
 
 #include <array>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <map>
@@ -272,6 +273,7 @@ struct SimulationResult {
     std::map<std::string, int> finalStats; // Final SP, Energy per char
     bool isZeroCycleClear = false;  // True if enemy defeated within 150 AV
     bool partyWiped = false;    // True if all allies fell (enemy offense)
+    uint32_t rngSeed = 42;      // Seed this run was executed with (0.2)
 };
 
 class SimulationEngine {
@@ -320,6 +322,18 @@ public:
     // one source of truth — entered finals OR component-built totals).
     int effectiveSpeed(const CharacterConfig& config);
     double effectiveStat(const CharacterConfig& config, const std::string& stat);
+
+public:
+    // Deterministic RNG (Milestone 0.2): one RNG service for all rolls
+    // (currently EHR gating; crits use expected values, never rolls).
+    // Every runSimulation reseeds from m_seed, so the same engine + seed
+    // replays bit-identically. setNoRng(true) is an analysis mode where
+    // gated checks resolve against a fixed roll of 0.0 (apply iff final
+    // chance > 0) instead of consuming RNG.
+    void setSeed(uint32_t seed) { m_seed = seed; }
+    uint32_t seed() const { return m_seed; }
+    void setNoRng(bool noRng) { m_noRng = noRng; }
+    bool noRng() const { return m_noRng; }
 
 private:
     // Internal state for running simulation (Sec 21.6: persistent combat
@@ -425,8 +439,8 @@ private:
     static bool waveReady(const std::vector<EnemyState>& enemies,
                           const EnemyState& e);
 
-    // Deterministic RNG (fixed seed): reproducible EHR rolls and therefore
-    // reproducible sims. Documented, not hidden.
+    uint32_t m_seed = 42;
+    bool m_noRng = false;
     std::mt19937 m_rng;
 };
 

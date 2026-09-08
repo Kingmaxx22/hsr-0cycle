@@ -165,6 +165,7 @@ void SimulationScreen::runSimulation() {
     std::cout << "  - Total Actions: " << lastResult.totalActions << std::endl;
     std::cout << "  - Total Damage: " << lastResult.totalDamage << std::endl;
     std::cout << "  - Timeline entries: " << lastResult.timeline.size() << std::endl;
+    std::cout << "  - RNG seed: " << lastResult.rngSeed << std::endl;
     // Console action log: one line per event so dense timelines stay
     // readable even when the boxes overlap on screen.
     for (size_t i = 0; i < lastResult.timeline.size(); ++i) {
