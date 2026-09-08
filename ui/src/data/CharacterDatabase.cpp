@@ -228,6 +228,10 @@ bool CharacterDatabase::load(const std::string& dataDir)
         // DoT base-chance default (0 when the CSV has no literal row).
         info.dotBaseChance = skillDb.dotChanceFor(info.id);
 
+        // Skill scaling extraction rows (damage multipliers only).
+        info.scalingRows = skillDb.scalingRowsFor(info.id);
+        info.scalingHiddenCount = skillDb.scalingHiddenFor(info.id);
+
         idIndex[info.id] = characters.size();
         characters.push_back(std::move(info));
     }

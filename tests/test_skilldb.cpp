@@ -53,6 +53,8 @@ int main()
     // Unknown slug: empty, no crash.
     CHECK(db.skillsFor("no-such-character").empty());
     CHECK(db.techniqueFor("no-such-character") == nullptr);
+    CHECK(db.scalingRowsFor("no-such-character").empty());
+    CHECK(db.scalingHiddenFor("no-such-character") == 0);
 
     // Phase 4.4: Techniques stored per slug (display only).
     const auto* tech = db.techniqueFor("acheron");
@@ -71,6 +73,38 @@ int main()
         if (kv.second.targetType == "AoE")
             hasAoe = true;
     CHECK(hasAoe);
+
+    // Scaling extraction: DanHeng maps to dan-heng with damage rows.
+    const auto& danheng = db.scalingRowsFor("dan-heng");
+    CHECK(!danheng.empty());
+    bool hasSkill = false;
+    for (const auto& row : danheng)
+    {
+        if (row.variable == "skillScaling")
+        {
+            hasSkill = true;
+            CHECK(row.abilityKind == "skill");
+            CHECK(row.base == 2.60);
+            CHECK(row.boosted == 2.86);
+            CHECK(row.literal);
+        }
+    }
+    CHECK(hasSkill);
+
+    // Luka's computed row is kept with empty values for manual declaration.
+    const auto& luka = db.scalingRowsFor("luka");
+    bool hasComputed = false;
+    for (const auto& row : luka)
+    {
+        if (row.variable == "basicEnhancedScaling")
+        {
+            hasComputed = true;
+            CHECK(!row.literal);
+            CHECK(row.base == 0.0);
+            CHECK(row.boosted == 0.0);
+        }
+    }
+    CHECK(hasComputed);
 
     if (failures == 0)
         std::printf("test_skilldb: all checks passed\n");

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "SkillDatabase.h"
+
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -64,6 +66,11 @@ struct CharacterInfo
     // Feeds CharacterConfig.breakDotChance; the DoT type/turns/scale stay
     // user-configured (tryApplyBreakDot needs all of them).
     double dotBaseChance = 0.0;
+    // Skill scaling extraction rows (damage multipliers only) + hidden
+    // non-damage row count. Declared per-action effective values on the
+    // Characters screen / SCALING screen; prefilled from the primary row.
+    std::vector<SkillDatabase::ScalingRow> scalingRows;
+    int scalingHiddenCount = 0;
 };
 
 class CharacterDatabase

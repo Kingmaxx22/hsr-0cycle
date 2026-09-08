@@ -46,6 +46,26 @@ public:
     // slug -> base chance (0..1). Only literal rows are stored;
     // computed rows (Black Swan, Guinaifen `dotChance` variables) are
     // skipped with a note — never guessed. Missing slug = no kit DoT.
+    // Skill scaling extraction (skill_scaling_raw.csv, first-pass regex
+    // dump from hsr-optimizer — NOT verified ground truth, spot-check
+    // before trusting). Only damage-multiplier rows are kept: the variable
+    // name must contain "scaling" (case-insensitive) and ability_kind one
+    // of basic/skill/ult/talent/memoSkill. Heal/flat/buff/pen rows,
+    // memoTalent rows, and non-literal rows (kept with empty values for
+    // manual declaration) are handled per comments below.
+    struct ScalingRow
+    {
+        std::string variable;    // e.g. "ultStygianResurgeScaling"
+        std::string abilityKind; // basic/skill/ult/talent/memoSkill
+        double base = 0.0;       // min_value (0 when non-literal/missing)
+        double boosted = 0.0;    // eidolon_value (0 when non-literal/missing)
+        bool literal = true;     // false -> values need manual reading
+    };
+    const std::vector<ScalingRow>& scalingRowsFor(
+        const std::string& slug) const;
+    // Count of CSV rows skipped for this slug (non-damage vars) — display.
+    int scalingHiddenFor(const std::string& slug) const;
+
     double dotChanceFor(const std::string& slug) const;
 
 private:
@@ -54,4 +74,6 @@ private:
         std::unordered_map<std::string, ParsedSkillData>> bySlug;
     std::unordered_map<std::string, TechniqueInfo> techniques;
     std::unordered_map<std::string, double> dotChances;
+    std::unordered_map<std::string, std::vector<ScalingRow>> scalingRows;
+    std::unordered_map<std::string, int> scalingHidden;
 };

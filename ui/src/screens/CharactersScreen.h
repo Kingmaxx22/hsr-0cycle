@@ -179,6 +179,31 @@ private:
     std::array<std::string, kExtraFieldCount> m_extraTexts{};
     int m_focusedExtraField = -1;
 
+    // Damage-table declarations (skill_scaling_raw.csv extraction):
+    // one editable (base, boosted) pair per shown damage action, writing
+    // the same scalingTables the SCALING screen edits. Focus ids start at
+    // kScalingFieldBase to avoid colliding with extra/manual fields.
+    static constexpr int kScalingFieldBase = 100;
+    static constexpr int kScalingMaxRows = 3;
+    // Parallel: shown action keys (basic/skill/ult/fua/memosprite) and
+    // the primary extraction variable per row ("" when none).
+    std::vector<std::string> m_scalingActions;
+    std::vector<std::string> m_scalingTexts; // 2 per row: base, boosted
+    int m_focusedScalingField = -1;
+    // Primary extraction row per damage action (largest base wins;
+    // multi-hit kits need a declared effective total — never inferred).
+    struct ScalingDeclRow {
+        std::string actionKey;
+        std::string variable;
+        int extraCount = 0;
+        bool literal = true;
+    };
+    std::vector<ScalingDeclRow> scalingDeclRows() const;
+    void ensureScalingPrefill(const CharacterInfo& info, CharacterLoadout& lo);
+    void syncScalingTexts();
+    void commitScalingField(int field);
+    Rectangle scalingFieldBounds(int field) const;
+
     // Back-navigation request (ESC with no field focused, or < Back button).
     bool m_backRequested = false;
     Rectangle backButtonBounds() const;

@@ -163,6 +163,102 @@ void loadDotChances(const std::string& dataDir,
     }
 }
 
+void loadScalingRows(
+    const std::string& dataDir,
+    std::unordered_map<std::string, std::vector<SkillDatabase::ScalingRow>>& out,
+    std::unordered_map<std::string, int>& hidden)
+{
+    std::ifstream file(dataDir + "/skill_scaling_raw.csv");
+    if (!file)
+        return; // Best-effort: missing file means no extraction reference.
+    std::string header;
+    if (!std::getline(file, header))
+        return;
+    if (header.size() >= 3 &&
+        static_cast<unsigned char>(header[0]) == 0xEF)
+        header = header.substr(3);
+    // Columns: character_file,path_id,ability_kind,variable_name,
+    // min_value,eidolon_value,eidolon_value_2,raw_args,literal.
+    // raw_args is quote-wrapped ("1.00, 1.10"), so split quote-aware.
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line.empty())
+            continue;
+        std::vector<std::string> cols;
+        std::string cur;
+        bool inQuotes = false;
+        for (size_t i = 0; i < line.size(); ++i)
+        {
+            char c = line[i];
+            if (inQuotes)
+            {
+                if (c == '"')
+                {
+                    if (i + 1 < line.size() && line[i + 1] == '"')
+                    {
+                        cur.push_back('"');
+                        ++i;
+                    }
+                    else
+                        inQuotes = false;
+                }
+                else
+                    cur.push_back(c);
+            }
+            else if (c == '"')
+                inQuotes = true;
+            else if (c == ',')
+            {
+                cols.push_back(cur);
+                cur.clear();
+            }
+            else
+                cur.push_back(c);
+        }
+        cols.push_back(cur);
+        if (cols.size() < 9)
+            continue;
+        std::string slug = normalizeDotSlug(cols[0]);
+        const std::string& ability = cols[2];
+        const std::string& variable = cols[3];
+        std::string lowerVar = variable;
+        for (char& c : lowerVar)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        bool isDamageAbility = (ability == "basic" || ability == "skill" ||
+                                ability == "ult" || ability == "talent" ||
+                                ability == "memoSkill");
+        if (!isDamageAbility || lowerVar.find("scaling") == std::string::npos)
+        {
+            // Heal/flat/buff/pen rows and memoTalent rows: not damage
+            // multipliers, excluded from declarations (counted for display).
+            hidden[slug]++;
+            continue;
+        }
+        SkillDatabase::ScalingRow row;
+        row.variable = variable;
+        row.abilityKind = ability;
+        row.literal = (cols[8] == "True");
+        if (row.literal)
+        {
+            try
+            {
+                if (!cols[4].empty())
+                    row.base = std::stod(cols[4]);
+                if (!cols[5].empty())
+                    row.boosted = std::stod(cols[5]);
+            }
+            catch (...)
+            {
+                row.literal = false;
+                row.base = 0.0;
+                row.boosted = 0.0;
+            }
+        }
+        out[slug].push_back(std::move(row));
+    }
+}
+
 } // namespace
 
 bool SkillDatabase::load(const std::string& dataDir)
@@ -191,6 +287,11 @@ bool SkillDatabase::load(const std::string& dataDir)
     // DoT base chances ride along (same dataDir, independent file).
     dotChances.clear();
     loadDotChances(dataDir, dotChances);
+
+    // Skill scaling extraction rides along too (independent file).
+    scalingRows.clear();
+    scalingHidden.clear();
+    loadScalingRows(dataDir, scalingRows, scalingHidden);
 
     for (const auto& entry : root["skills"])
     {
@@ -281,6 +382,24 @@ const SkillDatabase::TechniqueInfo* SkillDatabase::techniqueFor(
     if (it == techniques.end())
         return nullptr;
     return &it->second;
+}
+
+const std::vector<SkillDatabase::ScalingRow>& SkillDatabase::scalingRowsFor(
+    const std::string& slug) const
+{
+    static const std::vector<ScalingRow> empty;
+    auto it = scalingRows.find(slug);
+    if (it == scalingRows.end())
+        return empty;
+    return it->second;
+}
+
+int SkillDatabase::scalingHiddenFor(const std::string& slug) const
+{
+    auto it = scalingHidden.find(slug);
+    if (it == scalingHidden.end())
+        return 0;
+    return it->second;
 }
 
 double SkillDatabase::dotChanceFor(const std::string& slug) const

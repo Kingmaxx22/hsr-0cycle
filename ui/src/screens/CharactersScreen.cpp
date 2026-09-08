@@ -102,6 +102,162 @@ Rectangle CharactersScreen::traceRowBounds(int index, int setRows) const
     return Rectangle{310.0f, baseY, 390.0f, 38.0f};
 }
 
+std::vector<CharactersScreen::ScalingDeclRow> CharactersScreen::scalingDeclRows() const
+{
+    // One row per damage action with extraction data, in rotation
+    // priority. Primary = exact "<action>Scaling" variable, else the
+    // largest-base row (multi-hit kits: declare the effective total
+    // yourself — it is never inferred from the parts).
+    std::vector<ScalingDeclRow> out;
+    const CharacterInfo* info = selectedInfo();
+    if (info == nullptr)
+        return out;
+    static const char* keys[5] = {"basic", "skill", "ult", "fua", "memosprite"};
+    static const char* abilities[5] = {"basic", "skill", "ult", "talent", "memoSkill"};
+    static const char* exact[5] = {
+        "basicScaling", "skillScaling", "ultScaling", "talentScaling",
+        "memoSkillScaling"
+    };
+    for (int a = 0; a < 5; ++a)
+    {
+        const SkillDatabase::ScalingRow* primary = nullptr;
+        int count = 0;
+        for (const auto& row : info->scalingRows)
+        {
+            if (row.abilityKind != abilities[a])
+                continue;
+            ++count;
+            if (row.variable == exact[a])
+                primary = &row;
+        }
+        if (count == 0)
+            continue;
+        if (primary == nullptr)
+        {
+            for (const auto& row : info->scalingRows)
+            {
+                if (row.abilityKind != abilities[a])
+                    continue;
+                if (primary == nullptr || row.base > primary->base)
+                    primary = &row;
+            }
+        }
+        ScalingDeclRow decl;
+        decl.actionKey = keys[a];
+        decl.variable = primary->variable;
+        decl.extraCount = count - 1;
+        decl.literal = primary->literal;
+        out.push_back(decl);
+    }
+    return out;
+}
+
+void CharactersScreen::ensureScalingPrefill(const CharacterInfo& info,
+                                            CharacterLoadout& lo)
+{
+    // One-time prefill from the primary extraction row (literal only):
+    // fills empty tables so the boxes show sourced values; user edits win
+    // afterwards (never overwritten here again).
+    for (const auto& row : info.scalingRows)
+    {
+        std::string key;
+        if (row.abilityKind == "basic") key = "basic";
+        else if (row.abilityKind == "skill") key = "skill";
+        else if (row.abilityKind == "ult") key = "ult";
+        else if (row.abilityKind == "talent") key = "fua";
+        else if (row.abilityKind == "memoSkill") key = "memosprite";
+        else continue;
+        auto it = lo.scalingTables.find(key);
+        if (it != lo.scalingTables.end() &&
+            (it->second.base > 0.0 || it->second.boosted > 0.0))
+            continue;
+        // Prefill only from the primary row of this action.
+        bool primary = false;
+        for (const auto& decl : scalingDeclRows())
+        {
+            if (decl.actionKey == key && decl.variable == row.variable)
+                primary = true;
+        }
+        if (!primary || !row.literal)
+            continue;
+        CharacterLoadout::ScalingEntry entry;
+        entry.base = row.base;
+        entry.boosted = row.boosted;
+        lo.scalingTables[key] = entry;
+    }
+}
+
+void CharactersScreen::syncScalingTexts()
+{
+    auto rows = scalingDeclRows();
+    size_t shown = std::min(rows.size(), static_cast<size_t>(kScalingMaxRows));
+    if (m_scalingActions.size() != shown)
+    {
+        m_scalingActions.clear();
+        for (size_t i = 0; i < shown; ++i)
+            m_scalingActions.push_back(rows[i].actionKey);
+        m_scalingTexts.assign(shown * 2, "");
+        if (m_focusedScalingField >= static_cast<int>(shown * 2))
+            m_focusedScalingField = -1;
+    }
+    if (m_selectedCharacterId.empty())
+        return;
+    const CharacterLoadout& lo = loadoutFor(m_selectedCharacterId);
+    for (size_t i = 0; i < shown; ++i)
+    {
+        double base = 0.0, boosted = 0.0;
+        auto it = lo.scalingTables.find(m_scalingActions[i]);
+        if (it != lo.scalingTables.end())
+        {
+            base = it->second.base;
+            boosted = it->second.boosted;
+        }
+        for (int b = 0; b < 2; ++b)
+        {
+            int field = kScalingFieldBase + static_cast<int>(i) * 2 + b;
+            if (field == m_focusedScalingField)
+                continue;
+            double value = (b == 0) ? base : boosted;
+            m_scalingTexts[i * 2 + b] =
+                formatStatValueText(value * 100.0, "atk_pct");
+        }
+    }
+}
+
+void CharactersScreen::commitScalingField(int field)
+{
+    if (m_selectedCharacterId.empty())
+        return;
+    int local = field - kScalingFieldBase;
+    if (local < 0 || static_cast<size_t>(local) >= m_scalingTexts.size())
+        return;
+    CharacterLoadout& lo = loadoutFor(m_selectedCharacterId);
+    const std::string& text = m_scalingTexts[static_cast<size_t>(local)];
+    double number = 0.0;
+    try { number = text.empty() ? 0.0 : std::stod(text); }
+    catch (...) { number = 0.0; }
+    double value = std::max(0.0, number / 100.0);
+    const std::string& key = m_scalingActions[static_cast<size_t>(local) / 2];
+    CharacterLoadout::ScalingEntry& entry = lo.scalingTables[key];
+    if (local % 2 == 0)
+        entry.base = value;
+    else
+        entry.boosted = value;
+}
+
+Rectangle CharactersScreen::scalingFieldBounds(int field) const
+{
+    int local = field - kScalingFieldBase;
+    int row = local / 2;
+    int col = local % 2; // 0 = base, 1 = boosted
+    return Rectangle{
+        900.0f + col * 92.0f,
+        812.0f + row * 28.0f,
+        84.0f,
+        24.0f
+    };
+}
+
 std::vector<CharactersScreen::CondToggle> CharactersScreen::conditionalToggles(
     const CharacterLoadout& lo) const
 {
@@ -365,6 +521,7 @@ void CharactersScreen::update(float dt)
     if (!m_manualStatsMode && selectedInfo() != nullptr)
     {
         syncExtraTexts();
+        syncScalingTexts();
         if (clicked)
         {
             CharacterLoadout& lo = loadoutFor(m_selectedCharacterId);
@@ -379,6 +536,11 @@ void CharactersScreen::update(float dt)
                     if (m_focusedExtraField >= 0)
                         commitExtraField(m_focusedExtraField);
                     m_focusedExtraField = i;
+                    if (m_focusedScalingField >= 0)
+                    {
+                        commitScalingField(m_focusedScalingField);
+                        m_focusedScalingField = -1;
+                    }
                     hitSomething = true;
                     break;
                 }
@@ -455,6 +617,31 @@ void CharactersScreen::update(float dt)
                             }
                         }
                     }
+                    // Damage-table declaration boxes (right column).
+                    size_t scalingCount = m_scalingActions.size() * 2;
+                    for (size_t sf = 0; sf < scalingCount; ++sf)
+                    {
+                        int field = kScalingFieldBase + static_cast<int>(sf);
+                        if (CheckCollisionPointRec(mouse, scalingFieldBounds(field)))
+                        {
+                            if (m_focusedScalingField >= 0)
+                                commitScalingField(m_focusedScalingField);
+                            m_focusedScalingField = field;
+                            // Yield extra-field focus to exactly one editor.
+                            if (m_focusedExtraField >= 0)
+                            {
+                                commitExtraField(m_focusedExtraField);
+                                m_focusedExtraField = -1;
+                            }
+                            hitSomething = true;
+                            break;
+                        }
+                    }
+                    if (!hitSomething && m_focusedScalingField >= 0)
+                    {
+                        commitScalingField(m_focusedScalingField);
+                        m_focusedScalingField = -1;
+                    }
                 }
             }
         }
@@ -475,6 +662,15 @@ void CharactersScreen::update(float dt)
     else if (!m_manualStatsMode && m_focusedExtraField >= 0)
     {
         focusedText = &extraFieldText(m_focusedExtraField);
+        focusedIsDecimal = true;
+    }
+    else if (!m_manualStatsMode && m_focusedScalingField >= 0 &&
+             static_cast<size_t>(m_focusedScalingField - kScalingFieldBase) <
+                 m_scalingTexts.size())
+    {
+        focusedText =
+            &m_scalingTexts[static_cast<size_t>(m_focusedScalingField -
+                                                kScalingFieldBase)];
         focusedIsDecimal = true;
     }
 
@@ -510,11 +706,23 @@ void CharactersScreen::update(float dt)
                 commitManualTexts();
                 m_focusedManualField = (m_focusedManualField + 1) % kManualFieldCount;
             }
+            else if (m_focusedScalingField >= 0 && !m_scalingTexts.empty())
+            {
+                commitScalingField(m_focusedScalingField);
+                int local = m_focusedScalingField - kScalingFieldBase;
+                local = (local + 1) % static_cast<int>(m_scalingTexts.size());
+                m_focusedScalingField = kScalingFieldBase + local;
+            }
             else
             {
                 commitExtraField(m_focusedExtraField);
                 m_focusedExtraField = (m_focusedExtraField + 1) % kExtraFieldCount;
             }
+        }
+        if (IsKeyPressed(KEY_ENTER) && m_focusedScalingField >= 0)
+        {
+            commitScalingField(m_focusedScalingField);
+            m_focusedScalingField = -1;
         }
     }
     else if (IsKeyPressed(KEY_BACKSPACE) && !m_searchQuery.empty())
@@ -609,6 +817,17 @@ void CharactersScreen::update(float dt)
                     m_selectedCharacterId = m_filteredRoster[i]->id;
                     syncManualCharacterId();
                     m_pendingSelection = true;
+                    // Prefill damage tables from the extraction once;
+                    // user edits win afterwards.
+                    const CharacterInfo* selInfo = selectedInfo();
+                    if (selInfo != nullptr)
+                    {
+                        CharacterLoadout& selLo =
+                            loadoutFor(m_selectedCharacterId);
+                        ensureScalingPrefill(*selInfo, selLo);
+                    }
+                    m_focusedScalingField = -1;
+                    syncScalingTexts();
                 }
             }
         }
@@ -912,6 +1131,71 @@ void CharactersScreen::draw()
             }
             DrawText("% fields take percent-numbers (15 = 15%).",
                      720, 772, 12, GRAY);
+
+            // Damage-table declarations (extraction reference + fillable
+            // boxes). Prefilled from the primary extracted hit per action;
+            // multi-hit kits need a declared effective total. Writes the
+            // same scalingTables the SCALING screen edits.
+            auto declRows = scalingDeclRows();
+            if (!declRows.empty())
+            {
+                std::string declHeader =
+                    "DAMAGE TABLES — declare per level (extraction: verify";
+                const CharacterInfo* declInfo = selectedInfo();
+                if (declInfo != nullptr && declInfo->scalingHiddenCount > 0)
+                    declHeader += ", " +
+                        std::to_string(declInfo->scalingHiddenCount) +
+                        " non-dmg hidden";
+                declHeader += ")";
+                DrawText(declHeader.c_str(), 720, 792, 12, YELLOW);
+                size_t shown = std::min(declRows.size(),
+                                        static_cast<size_t>(kScalingMaxRows));
+                for (size_t di = 0; di < shown; ++di)
+                {
+                    float rowY = 810.0f + di * 28.0f;
+                    std::string label = declRows[di].actionKey + " " +
+                        declRows[di].variable;
+                    if (declRows[di].extraCount > 0)
+                        label += " +" + std::to_string(declRows[di].extraCount);
+                    if (!declRows[di].literal)
+                        label += " *manual*";
+                    if (label.size() > 26)
+                        label = label.substr(0, 23) + "...";
+                    DrawText(label.c_str(), 720, static_cast<int>(rowY + 5),
+                             12, LIGHTGRAY);
+                    for (int b = 0; b < 2; ++b)
+                    {
+                        int field = kScalingFieldBase +
+                            static_cast<int>(di) * 2 + b;
+                        Rectangle f = scalingFieldBounds(field);
+                        bool focused = (m_focusedScalingField == field);
+                        DrawRectangleRounded(f, 0.2f, 8,
+                            focused ? Color{44, 52, 70, 255}
+                                    : Color{28, 31, 41, 255});
+                        DrawRectangleRoundedLines(f, 0.2f, 8,
+                            focused ? Color{115, 140, 190, 255}
+                                    : Color{55, 59, 72, 255});
+                        std::string shownText =
+                            m_scalingTexts[di * 2 + b];
+                        if (focused)
+                            shownText += "_";
+                        if (shownText.empty() && !focused)
+                            shownText = "-";
+                        DrawText(shownText.c_str(),
+                                 static_cast<int>(f.x + 8),
+                                 static_cast<int>(f.y + 5), 13, RAYWHITE);
+                    }
+                }
+                if (declRows.size() > shown)
+                {
+                    std::string more = "+" +
+                        std::to_string(declRows.size() - shown) +
+                        " more — see SCALING screen";
+                    DrawText(more.c_str(), 720,
+                             static_cast<int>(810.0f + shown * 28.0f),
+                             11, GRAY);
+                }
+            }
         }
 
         // Instruction
