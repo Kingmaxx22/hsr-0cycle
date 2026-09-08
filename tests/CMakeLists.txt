@@ -46,6 +46,12 @@ hsr_add_test(test_eidolons
     ${CMAKE_SOURCE_DIR}/ui/src/data/LoadoutResolver.cpp
 )
 
+# Break-formula verification (research-notes package + boost terms).
+hsr_add_test(test_breakformula
+    test_breakformula.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)
+
 # Phase 4.2: break-DoT application and ticking.
 hsr_add_test(test_dots
     test_dots.cpp

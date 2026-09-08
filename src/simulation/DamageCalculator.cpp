@@ -774,9 +774,11 @@ BreakDamageResult calculateBreakDamage(const BreakDamageConfig& config) {
     double elemMult = elementBreakMultiplier(config.attackerElement);
     result.baseBreak = elemMult * base;
 
-    // Max Toughness Multiplier = 0.5 + maxToughness / 40 (wiki).
+    // Max Toughness Multiplier = 0.5 + maxToughness / 120, taken as one
+    // internally-consistent package with the 3767.5533 constant and the
+    // ElementScaling table (research notes, hsr-optimizer MIT).
     double maxTough = std::max(0.0, config.enemyMaxToughness);
-    result.toughnessMultiplier = 0.5 + maxTough / 40.0;
+    result.toughnessMultiplier = 0.5 + maxTough / 120.0;
 
     result.defenseMultiplier = calculateDefenseMultiplier(config.defenseConfig);
     result.resistanceMultiplier = calculateResistanceMultiplier(config.resistanceConfig);
@@ -784,12 +786,22 @@ BreakDamageResult calculateBreakDamage(const BreakDamageConfig& config) {
     result.universalReductionMultiplier =
         calculateUniversalDamageReductionMultiplier(config.universalReductionConfig);
 
+    // Hit-level Boost, final-DMG Boost and true-DMG modifier (research
+    // notes). No engine stat sources them yet, so they default to 0
+    // (neutral); the terms stay for formula completeness.
+    result.hitBoostMultiplier = 1.0 + std::max(0.0, config.hitLevelBoost);
+    result.finalDmgMultiplier = 1.0 + std::max(0.0, config.finalDmgBoost);
+    result.trueDmgMultiplier = 1.0 + std::max(0.0, config.trueDmgModifier);
+
     // Ability Multiplier defaults to 1.0 (unmodeled per-hit ability mults).
-    // CRIT, DMG Boost and Weaken are excluded per source.
+    // CRIT is excluded per source (Break can't crit).
     result.finalBreakDamage = result.baseBreak
         * result.toughnessMultiplier
         * (1.0 + std::max(0.0, config.breakEffect))
         * (1.0 + std::max(0.0, config.breakDmgIncrease))
+        * result.hitBoostMultiplier
+        * result.finalDmgMultiplier
+        * result.trueDmgMultiplier
         * result.defenseMultiplier
         * result.resistanceMultiplier
         * result.vulnerabilityMultiplier
@@ -805,14 +817,22 @@ double calculateSuperBreakDamage(
     double defenseMultiplier,
     double resistanceMultiplier,
     double vulnerabilityMultiplier,
-    double universalBrokenMultiplier) {
+    double universalBrokenMultiplier,
+    double hitLevelBoost,
+    double finalDmgBoost,
+    double trueDmgModifier) {
     if (toughnessDamage <= 0.0 || superBreakModifier <= 0.0)
         return 0.0;
-    // (baseBreakByLevel(80) / 10) per hsr-optimizer SuperBreakDamageFunction.
+    // (baseBreakByLevel(80) / 10) x effectiveToughness (research notes,
+    // hsr-optimizer MIT). The caller folds breakEfficiencyBoost into
+    // toughnessDamage before calling.
     double superBreakBase = (baseBreakByLevel(80) / 10.0) * toughnessDamage;
     return superBreakBase
         * (1.0 + std::max(0.0, breakEffect))
         * superBreakModifier
+        * (1.0 + std::max(0.0, hitLevelBoost))
+        * (1.0 + std::max(0.0, finalDmgBoost))
+        * (1.0 + std::max(0.0, trueDmgModifier))
         * defenseMultiplier
         * resistanceMultiplier
         * vulnerabilityMultiplier

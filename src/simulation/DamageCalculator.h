@@ -724,23 +724,28 @@ double calculateHealAmount(double skillHealMultiplier, double outgoingHealingBoo
 
 // ----------------------------------------------------------------------------
 // Break milestone: Weakness Break event damage.
-// Formula:
-//   breakDamage = elementMult x baseBreakByLevel x (0.5 + maxToughness/40)
-//               x (1 + breakEffect) x DEFmult x RESmult x vulnMult
-//               x universalReductionMult (0.9: the break hit itself lands
-//                 while the enemy still counts as unbroken)
-// Sourcing (spec-grade, no values from memory):
-// - baseBreakByLevel[1..95]: HSR wiki Toughness page Level Multiplier table
-//   (anchor-verified: L65=2176.7983 vs the HSR DMG Calculator sheet,
-//   L80=3767.5533 vs hsr-optimizer damageCalculator.ts).
-// - elementMult: Physical/Fire 2.0, Wind 1.5, Ice/Lightning 1.0,
-//   Quantum/Imaginary 0.5 (wiki + calculator sheet + two guides agree).
-// - toughness divisor /40 per the wiki. NOTE: hsr-optimizer's code uses
-//   /120 with the same L80 constant — irreconcilable with the wiki table
-//   (factor ~2.7x at T=300), so the wiki/spec form wins by source count.
-// Excluded per source: CRIT, DMG Boost, Weaken.
-// Ability Multiplier and Break-DMG-Increase sources (e.g. Fugue E4) are
-// not modeled: both default to 1.0. Super Break is out of scope.
+// Formula (research notes, fribbels/hsr-optimizer MIT — single
+// internally-consistent package: 3767.5533 constant + ElementScaling +
+// toughness term; MIT notice retained in break_dot_research_notes.md):
+//   breakDamage = weaknessBrokenMulti x defMulti x resMulti x vulnMulti
+//               x finalDmgMulti x dmgBoostMulti(hit-level) x breakBaseMulti
+//               x beMulti x trueDmgMulti
+//   breakBaseMulti = 3767.5533 x ElementScaling[element]
+//                  x (0.5 + enemyMaxToughness / 120)
+// ElementScaling: Physical/Fire 2.0, Wind 1.5, Ice/Lightning 1.0,
+//                 Quantum/Imaginary 0.5.
+// Stage mapping onto this project's verified pieces (proven identical):
+// - weaknessBrokenMulti (1.0 broken / 0.9 unbroken) == the universal
+//   reduction stage (0.9 while toughness holds, 1.0 once broken).
+// - resMulti 1-clamp(RES-PEN,-1,0.9) == the RES stage (same outputs:
+//   PEN is uncapped but the [0.1, 2.0] mult clamp absorbs it identically).
+// - vulnMulti 1+clamp(vuln,0,2.5) == the standard vulnerability stage.
+// - defMulti: the notes' form takes optimizer-level inputs only; this
+//   project keeps its richer Sec 4 DEF stage (DEF buffs, reduction,
+//   ignore, shred, flat) — documented deviation, not an oversight.
+// - breakDmgIncrease (e.g. Fugue E4) is a project extension (no notes
+//   counterpart), user-asserted, defaults neutral.
+// Excluded per source: CRIT, ATK scaling, elemental DMG%.
 // ----------------------------------------------------------------------------
 struct BreakDamageConfig
 {
@@ -749,6 +754,10 @@ struct BreakDamageConfig
     double breakEffect = 0.0;    // decimals
     // Break-DMG-Increase sources (e.g. Fugue E4): x(1+increase).
     double breakDmgIncrease = 0.0;
+    // Research-notes boost terms (no engine stat sources yet; 0 = neutral).
+    double hitLevelBoost = 0.0;  // HIT-level Boost only, not action/elemental
+    double finalDmgBoost = 0.0;
+    double trueDmgModifier = 0.0;
     double enemyMaxToughness = 0.0;
     DefenseMultiplierConfig defenseConfig;
     ResistanceMultiplierConfig resistanceConfig; // caller pre-resolves RES
@@ -762,6 +771,9 @@ struct BreakDamageResult
 {
     double baseBreak = 0.0;      // elementMult x baseBreakByLevel
     double toughnessMultiplier = 1.0;
+    double hitBoostMultiplier = 1.0;
+    double finalDmgMultiplier = 1.0;
+    double trueDmgMultiplier = 1.0;
     double defenseMultiplier = 1.0;
     double resistanceMultiplier = 1.0;
     double vulnerabilityMultiplier = 1.0;
@@ -775,13 +787,15 @@ double baseBreakByLevel(int level);
 double elementBreakMultiplier(const std::string& element);
 BreakDamageResult calculateBreakDamage(const BreakDamageConfig& config);
 
-// Super Break (documented simplification of hsr-optimizer's
-// SuperBreakDamageFunction): an attacker with superBreakModifier > 0
-// converts toughness damage dealt to an already-broken enemy into
-//   superBreak = (baseL80/10) x toughnessDamage x (1+BE) x modifier
-//              x defMult x resMult x vulnMult x universalMult(broken).
+// Super Break (research notes, hsr-optimizer MIT):
+//   SuperBreakDamage = weaknessBrokenMulti x defMulti x resMulti x vulnMulti
+//                    x finalDmgMulti x dmgBoostMulti(hit-level)
+//                    x superBreakBaseMulti x beMulti x superBreakModMulti
+//                    x trueDmgMulti
+//   superBreakBaseMulti = (3767.5533 / 10) x effectiveToughness
 // The caller supplies the already-computed shared multipliers plus the
-// broken-state universal multiplier. No crit, no DMG Boost (per source).
+// broken-state universal multiplier, and folds breakEfficiencyBoost into
+// toughnessDamage (effectiveToughness). No crit (per source).
 double calculateSuperBreakDamage(
     double toughnessDamage,
     double breakEffect,
@@ -789,7 +803,10 @@ double calculateSuperBreakDamage(
     double defenseMultiplier,
     double resistanceMultiplier,
     double vulnerabilityMultiplier,
-    double universalBrokenMultiplier);
+    double universalBrokenMultiplier,
+    double hitLevelBoost = 0.0,
+    double finalDmgBoost = 0.0,
+    double trueDmgModifier = 0.0);
 
 // SECTION 18: Mid-turn speed change AV recalculation.
 double calculateMidTurnSpeedChange(
