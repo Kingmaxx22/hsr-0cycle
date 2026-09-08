@@ -117,6 +117,7 @@ int main()
         EncounterConfig enc;
         enc.slots[0].push_back(makeFoe("wave_a", "Wave A"));
         enc.slots[0].push_back(makeFoe("wave_b", "Wave B"));
+        enc.sequential[0] = false; // sequential is the default; opt out here
 
         SimulationEngine engine;
         SimulationResult r = engine.runSimulation({makeDps()}, enc, 15000);

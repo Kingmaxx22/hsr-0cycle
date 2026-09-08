@@ -237,13 +237,14 @@ struct EnemyConfig {
 
 // Encounter: exactly five enemy slots (Sec 19/22.9); each slot holds
 // zero or more enemy instances. Enemies with spawnAv > 0 enter combat
-// dynamically without creating new slots. A sequential slot is a wave:
-// only its first living entry is active; each later entry activates when
-// every earlier entry in that slot is dead (off by default, so stacked
-// duplicates still fight together unless the slot is armed as a wave).
+// dynamically without creating new slots. Slots are sequential (wave) by
+// default: only the first living entry is active; each later entry
+// activates when every earlier entry in that slot is dead. Set
+// sequential[s] = false for a concurrent slot where all entries fight
+// together (Blast/AoE multi-enemy behavior).
 struct EncounterConfig {
     std::array<std::vector<EnemyConfig>, 5> slots;
-    std::array<bool, 5> sequential = {false, false, false, false, false};
+    std::array<bool, 5> sequential = {true, true, true, true, true};
 
     // Flattened view (slot order, then insertion order) for the engine loop.
     std::vector<EnemyConfig> flatten() const {

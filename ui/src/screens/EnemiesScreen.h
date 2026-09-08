@@ -82,8 +82,8 @@ private:
 
     std::array<std::vector<SlotEntry>, kSlotCount> slots;
     int activeSlot = 0;
-    // Wave arming per slot (false = all entries fight together).
-    std::array<bool, kSlotCount> slotSequential = {false, false, false, false, false};
+    // Wave arming per slot (default ON: one entry active at a time).
+    std::array<bool, kSlotCount> slotSequential = {true, true, true, true, true};
 
     std::vector<const EnemyInfo*> filtered;
     int hoveredRow = -1;
