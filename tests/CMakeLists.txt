@@ -29,6 +29,13 @@ hsr_add_test(test_multitarget
     ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
 )
 
+# Phase 4.3: multi-layered toughness and Exo-Toughness (direct config).
+hsr_add_test(test_bars
+    test_bars.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)
+
 # Phase 4.2: break-DoT application and ticking.
 hsr_add_test(test_dots
     test_dots.cpp

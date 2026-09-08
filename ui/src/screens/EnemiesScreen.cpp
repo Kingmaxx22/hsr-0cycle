@@ -157,7 +157,7 @@ Rectangle EnemiesScreen::slotTabBounds(int slot)
 // Slot-content rows live at the bottom of the right detail panel.
 Rectangle EnemiesScreen::slotEntryBounds(int entryRow) const
 {
-    return Rectangle{1142.0f, 666.0f + entryRow * 26.0f, 256.0f, 24.0f};
+    return Rectangle{1142.0f, 666.0f + entryRow * 26.0f, 290.0f, 24.0f};
 }
 
 Rectangle EnemiesScreen::slotEntryRemoveBounds(int entryRow) const
@@ -169,19 +169,25 @@ Rectangle EnemiesScreen::slotEntryRemoveBounds(int entryRow) const
 Rectangle EnemiesScreen::slotEntrySpawnMinusBounds(int entryRow) const
 {
     Rectangle r = slotEntryBounds(entryRow);
-    return Rectangle{r.x + 92.0f, r.y + 2.0f, 20.0f, 20.0f};
+    return Rectangle{r.x + 76.0f, r.y + 2.0f, 20.0f, 20.0f};
 }
 
 Rectangle EnemiesScreen::slotEntrySpawnPlusBounds(int entryRow) const
 {
     Rectangle r = slotEntryBounds(entryRow);
-    return Rectangle{r.x + 152.0f, r.y + 2.0f, 20.0f, 20.0f};
+    return Rectangle{r.x + 98.0f, r.y + 2.0f, 20.0f, 20.0f};
 }
 
 Rectangle EnemiesScreen::slotEntryResBounds(int entryRow) const
 {
     Rectangle r = slotEntryBounds(entryRow);
-    return Rectangle{r.x + 176.0f, r.y + 2.0f, 58.0f, 20.0f};
+    return Rectangle{r.x + 150.0f, r.y + 2.0f, 58.0f, 20.0f};
+}
+
+Rectangle EnemiesScreen::slotEntryExoBounds(int entryRow) const
+{
+    Rectangle r = slotEntryBounds(entryRow);
+    return Rectangle{r.x + 210.0f, r.y + 2.0f, 50.0f, 20.0f};
 }
 
 Rectangle EnemiesScreen::slotClearBounds() const
@@ -208,20 +214,21 @@ void EnemiesScreen::drawSlotContents()
         DrawRectangleRoundedLines(r, 0.12f, 6, kPanelBorder);
 
         std::string name = info != nullptr ? info->name : slot[e].id;
-        if (name.size() > 13)
-            name = name.substr(0, 12) + ".";
+        if (name.size() > 9)
+            name = name.substr(0, 8) + ".";
         DrawText(name.c_str(), static_cast<int>(r.x + 6),
                  static_cast<int>(r.y + 5), 12, RAYWHITE);
 
         // Spawn clock (0 = present from the start).
         std::string av = (slot[e].spawnAv <= 0) ? "0"
                          : std::to_string(slot[e].spawnAv);
-        DrawText(av.c_str(), static_cast<int>(r.x + 114),
+        DrawText(av.c_str(), static_cast<int>(r.x + 120),
                  static_cast<int>(r.y + 5), 11, kDimText);
 
         Rectangle minusR = slotEntrySpawnMinusBounds(row);
         Rectangle plusR = slotEntrySpawnPlusBounds(row);
         Rectangle resR = slotEntryResBounds(row);
+        Rectangle exoR = slotEntryExoBounds(row);
         Rectangle xR = slotEntryRemoveBounds(row);
         DrawRectangleRounded(minusR, 0.2f, 4, kPanelBg);
         DrawRectangleRoundedLines(minusR, 0.2f, 4, kPanelBorder);
@@ -240,6 +247,14 @@ void EnemiesScreen::drawSlotContents()
         DrawText(resLabel.c_str(), static_cast<int>(resR.x + 5),
                  static_cast<int>(resR.y + 3), 11,
                  slot[e].resOverride >= 0.0 ? RAYWHITE : kDimText);
+        // Phase 4.3: user-asserted Exo-Toughness (0 = none).
+        std::string exoLabel = (slot[e].exoToughness <= 0)
+            ? "E:-" : "E:" + std::to_string(slot[e].exoToughness);
+        DrawRectangleRounded(exoR, 0.2f, 4, kPanelBg);
+        DrawRectangleRoundedLines(exoR, 0.2f, 4, kPanelBorder);
+        DrawText(exoLabel.c_str(), static_cast<int>(exoR.x + 5),
+                 static_cast<int>(exoR.y + 3), 11,
+                 slot[e].exoToughness > 0 ? RAYWHITE : kDimText);
         DrawRectangleRounded(xR, 0.2f, 4, Color{90, 30, 30, 255});
         DrawText("x", static_cast<int>(xR.x + 6),
                  static_cast<int>(xR.y + 2), 12, RAYWHITE);
@@ -427,6 +442,20 @@ void EnemiesScreen::update(float dt)
                     entry.resOverride = 40.0;
                 else
                     entry.resOverride = -1.0;
+                return;
+            }
+            if (CheckCollisionPointRec(mouse, slotEntryExoBounds(row)))
+            {
+                // Phase 4.3: cycle Exo-Toughness 0 -> 30 -> 60 -> 90 -> 0.
+                SlotEntry& entry = slots[static_cast<size_t>(activeSlot)][static_cast<size_t>(row)];
+                if (entry.exoToughness < 30)
+                    entry.exoToughness = 30;
+                else if (entry.exoToughness < 60)
+                    entry.exoToughness = 60;
+                else if (entry.exoToughness < 90)
+                    entry.exoToughness = 90;
+                else
+                    entry.exoToughness = 0;
                 return;
             }
         }

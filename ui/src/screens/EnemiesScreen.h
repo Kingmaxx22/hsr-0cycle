@@ -19,6 +19,10 @@ struct SlotEntry
     // Per-entry RES override in percent-points (-1 = Q2 auto-rule).
     // Cycles auto -> 0 -> 20 -> 40 -> auto in the slot editor.
     double resOverride = -1.0;
+    // Phase 4.3: user-asserted Exo-Toughness (0 = none). No data source
+    // carries Exo values, so this is manual per-encounter configuration.
+    // Cycles 0 -> 30 -> 60 -> 90 -> 0 in the slot editor.
+    int exoToughness = 0;
 };
 
 class EnemiesScreen : public Screen
@@ -54,6 +58,7 @@ private:
     Rectangle slotEntrySpawnMinusBounds(int entryRow) const;
     Rectangle slotEntrySpawnPlusBounds(int entryRow) const;
     Rectangle slotEntryResBounds(int entryRow) const;
+    Rectangle slotEntryExoBounds(int entryRow) const;
     Rectangle slotClearBounds() const;
 
     void rebuildFiltered();

@@ -172,6 +172,8 @@ static hsr::EncounterConfig BuildEncounter(
             config.offenseTargetType = info->offenseTargetType;
             // Phase 4.2: enemy Effect RES gates DoT/debuff application.
             config.effectRes = info->effectRes / 100.0;
+            // Phase 4.3: user-asserted Exo-Toughness (0 = none).
+            config.exoToughness = std::max(0, entry.exoToughness);
             // Per-entry RES override wins over the Q2 auto-rule; negative
             // keeps auto (weakness-first, then map, else 20%).
             if (entry.resOverride >= 0.0)
