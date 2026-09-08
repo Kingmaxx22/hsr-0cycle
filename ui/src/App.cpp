@@ -124,6 +124,10 @@ static hsr::CharacterConfig BuildSimCharacter(
             config.skillMultiplier = 2.0;
             config.ultMultiplier = 3.0;
             config.fuaMultiplier = 1.0;
+            // Break-DoT from manual config (Sec 4.2).
+            config.breakDotType = manual.breakDotType;
+            config.breakDotTurns = manual.breakDotTurns;
+            config.breakDotAtkScale = manual.breakDotAtkScale;
             return config;
         }
     }

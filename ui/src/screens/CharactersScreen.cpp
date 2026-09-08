@@ -62,6 +62,14 @@ Rectangle CharactersScreen::manualFieldBounds(int index) const
     return Rectangle{x, top, 200.0f, 28.0f};
 }
 
+Rectangle CharactersScreen::dotFieldBounds(int index) const
+{
+    // Break-DoT fields: 3 in a row below the stat summary.
+    float top = manualFieldBounds(9).y + 80.0f;
+    float x = 410.0f + static_cast<float>(index) * 230.0f;
+    return Rectangle{x, top, 200.0f, 28.0f};
+}
+
 Rectangle CharactersScreen::extraFieldBounds(int index) const
 {
     // Other bonuses: 5 cols x 2 rows at right; base override: 4-in-a-row.
@@ -438,6 +446,11 @@ void CharactersScreen::commitManualTexts()
     mc.resPen = parsePercentText(m_manualTexts[7]);
     mc.ehr = parsePercentText(m_manualTexts[8]);
     mc.effectRes = parsePercentText(m_manualTexts[9]);
+    // Break-DoT fields
+    mc.breakDotType = m_dotTexts[0];
+    mc.breakDotTurns = parseStatText(m_dotTexts[1]);
+    try { mc.breakDotAtkScale = std::stod(m_dotTexts[2]); }
+    catch (...) { mc.breakDotAtkScale = 0.0; }
 }
 
 void CharactersScreen::syncManualCharacterId()
@@ -466,10 +479,17 @@ void CharactersScreen::syncManualCharacterId()
             ? std::to_string(static_cast<int>(mc.ehr * 100.0)) : "";
         m_manualTexts[9] = mc.effectRes > 0.0
             ? std::to_string(static_cast<int>(mc.effectRes * 100.0)) : "";
+        // Break-DoT fields
+        m_dotTexts[0] = mc.breakDotType;
+        m_dotTexts[1] = mc.breakDotTurns > 0
+            ? std::to_string(mc.breakDotTurns) : "";
+        m_dotTexts[2] = mc.breakDotAtkScale > 0.0
+            ? std::to_string(mc.breakDotAtkScale) : "";
     }
     else
     {
         for (auto& t : m_manualTexts) t.clear();
+        for (auto& t : m_dotTexts) t.clear();
     }
 }
 
@@ -543,6 +563,26 @@ void CharactersScreen::update(float dt)
             // Clicking outside a field commits its content.
             commitManualTexts();
             m_focusedManualField = -1;
+        }
+        // Break-DoT field focus
+        int hitDot = -1;
+        for (int i = 0; i < kDotFieldCount; ++i)
+        {
+            if (CheckCollisionPointRec(mouse, dotFieldBounds(i)))
+            {
+                hitDot = i;
+                break;
+            }
+        }
+        if (hitDot >= 0)
+        {
+            commitManualTexts();
+            m_focusedDotField = hitDot;
+        }
+        else if (m_focusedDotField >= 0)
+        {
+            commitManualTexts();
+            m_focusedDotField = -1;
         }
     }
 
@@ -689,6 +729,11 @@ void CharactersScreen::update(float dt)
         focusedText = &m_manualTexts[static_cast<size_t>(m_focusedManualField)];
         focusedIsDecimal = (m_focusedManualField >= 4);
     }
+    else if (m_manualStatsMode && m_focusedDotField >= 0)
+    {
+        focusedText = &m_dotTexts[static_cast<size_t>(m_focusedDotField)];
+        focusedIsDecimal = (m_focusedDotField == 2); // ATK scale is decimal
+    }
     else if (!m_manualStatsMode && m_focusedExtraField >= 0)
     {
         focusedText = &extraFieldText(m_focusedExtraField);
@@ -731,10 +776,15 @@ void CharactersScreen::update(float dt)
             focusedText->pop_back();
         if (IsKeyPressed(KEY_TAB))
         {
-            if (m_manualStatsMode)
+            if (m_manualStatsMode && m_focusedManualField >= 0)
             {
                 commitManualTexts();
                 m_focusedManualField = (m_focusedManualField + 1) % kManualFieldCount;
+            }
+            else if (m_manualStatsMode && m_focusedDotField >= 0)
+            {
+                commitManualTexts();
+                m_focusedDotField = (m_focusedDotField + 1) % kDotFieldCount;
             }
             else if (m_focusedScalingField >= 0 && !m_scalingTexts.empty())
             {
@@ -771,6 +821,13 @@ void CharactersScreen::update(float dt)
             if (m_focusedManualField == 0)
                 m_focusedManualField = -1; // full pass done: defocus
         }
+        else if (m_focusedDotField >= 0)
+        {
+            commitManualTexts();
+            m_focusedDotField = (m_focusedDotField + 1) % kDotFieldCount;
+            if (m_focusedDotField == 0)
+                m_focusedDotField = -1;
+        }
         else if (m_focusedExtraField >= 0)
         {
             commitExtraField(m_focusedExtraField);
@@ -791,6 +848,11 @@ void CharactersScreen::update(float dt)
         {
             commitManualTexts();
             m_focusedManualField = -1;
+        }
+        else if (m_focusedDotField >= 0)
+        {
+            commitManualTexts();
+            m_focusedDotField = -1;
         }
         else if (m_focusedExtraField >= 0)
         {
@@ -1285,6 +1347,28 @@ void CharactersScreen::draw()
             "% PEN " + std::to_string(static_cast<int>(mc.resPen * 100.0)) +
             "% EHR " + std::to_string(static_cast<int>(mc.ehr * 100.0)) + "%";
         DrawText(summary2.c_str(), 310, summaryY + 18, 13, YELLOW);
+
+        // Break-DoT configuration fields (Sec 4.2).
+        DrawText("BREAK DOT", 310, static_cast<int>(dotFieldBounds(0).y - 18), 14, ORANGE);
+        const char* dotLabels[kDotFieldCount] = {"Type", "Turns", "ATK Scale"};
+        for (int i = 0; i < kDotFieldCount; ++i)
+        {
+            Rectangle field = dotFieldBounds(i);
+            const bool focused = (m_focusedDotField == i);
+            DrawText(dotLabels[i], static_cast<int>(field.x - 60), static_cast<int>(field.y + 7), 14, WHITE);
+            DrawRectangleRounded(field, 0.2f, 8,
+                focused ? Color{44, 52, 70, 255} : Color{28, 31, 41, 255});
+            DrawRectangleRoundedLines(field, 0.2f, 8,
+                focused ? Color{115, 140, 190, 255} : Color{55, 59, 72, 255});
+            std::string shown = m_dotTexts[static_cast<size_t>(i)];
+            if (focused) shown += "_";
+            if (shown.empty() && !focused) shown = "-";
+            DrawText(shown.c_str(), static_cast<int>(field.x + 10),
+                     static_cast<int>(field.y + 6), 14,
+                     m_dotTexts[static_cast<size_t>(i)].empty() && !focused ? GRAY : RAYWHITE);
+        }
+        DrawText("(Burn, Shock, Bleed, WindShear; 0 = none)", 310,
+                 static_cast<int>(dotFieldBounds(0).y + 34), 11, GRAY);
     }
 
     // --- Selection prompt (input itself is handled in update()) ---

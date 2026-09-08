@@ -30,6 +30,10 @@ public:
         double resPen = 0.0;
         double ehr = 0.0;
         double effectRes = 0.0;
+        // Break-DoT configuration (user-asserted per character, Sec 4.2).
+        std::string breakDotType;     // e.g. "Burn", "Shock"
+        int breakDotTurns = 0;        // tick count (enemy turns)
+        double breakDotAtkScale = 0.0;// tick base = scale x source ATK
     };
 
     CharactersScreen(AssetManager& assets, CharacterDatabase& characters,
@@ -99,6 +103,7 @@ private:
     Rectangle searchBoxBounds() const;
     Rectangle searchClearButtonBounds() const;
     Rectangle manualFieldBounds(int index) const;
+    Rectangle dotFieldBounds(int index) const;
     float manualContentTop() const;
     static int parseStatText(const std::string& text);
     static double parsePercentText(const std::string& text);
@@ -179,6 +184,11 @@ private:
     std::array<std::string, kManualFieldCount> m_manualTexts{};
     // Focused manual field: -1 = none, else 0..9.
     int m_focusedManualField = -1;
+
+    // Break-DoT text buffers (type string, turns int, atk-scale float).
+    static constexpr int kDotFieldCount = 3;
+    std::array<std::string, kDotFieldCount> m_dotTexts{};
+    int m_focusedDotField = -1;
 
     // Build-tab editor buffers: 0-8 other bonuses, 9-12 base override.
     std::array<std::string, kExtraFieldCount> m_extraTexts{};
