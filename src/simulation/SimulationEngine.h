@@ -342,7 +342,6 @@ private:
         CharacterConfig config;
         int currentAv;      // Current AV threshold for next turn
         int actionIndex;    // Where in the rotation we are
-        int sp;
         float energy;
         int currentHp;      // Live HP (heals restore up to max; no enemy
                             // offense exists yet, so nothing depletes it)
@@ -389,13 +388,15 @@ private:
     int calculateHitDamage(const CharState& charState, const EnemyState& enemyState,
                            const std::string& actionType, ActionEvent& outEvent,
                            double multOverride = 0.0);
-    void applyActionEffects(std::vector<CharState>& allies,
-                            size_t actorIdx,
-                            std::vector<EnemyState>& enemies,
-                            EnemyState* target,
-                            const std::string& actionType,
-                            int currentGlobalAv,
-                            std::vector<ActionEvent>& timeline);
+void applyActionEffects(std::vector<CharState>& allies,
+                             size_t actorIdx,
+                             std::vector<EnemyState>& enemies,
+                             EnemyState* target,
+                             const std::string& actionType,
+                             int currentGlobalAv,
+                             int& teamSp,
+                             int teamMaxSp,
+                             std::vector<ActionEvent>& timeline);
     // One hit (primary or splash) against a single enemy: master-formula
     // damage into ev.damageDealt, HP/toughness/break/super-break/exo state
     // updates, break portion into ev.breakDamage. Caller aggregates.

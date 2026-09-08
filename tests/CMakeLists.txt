@@ -118,3 +118,10 @@ hsr_add_test(test_waves
     ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
     ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
 )
+
+# Milestone 1.4: shared team Skill Point pool (one pool for all members).
+hsr_add_test(test_sp
+    test_sp.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)

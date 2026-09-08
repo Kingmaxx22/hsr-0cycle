@@ -22,8 +22,9 @@ namespace hsr {
 // would loop forever (the engine action cap is the backstop).
 //
 // Two documented limitations (not hidden):
-// - Ult energy is not modeled by the engine, so a sequenced Ult always
-//   fires. Patterns with Ult are optimistic until energy gating lands.
+// - Ult is energy-gated by the engine (falls back to Basic uncharged),
+//   so patterns with Ult are evaluated honestly; starting energy comes
+//   from each CharacterConfig.
 // - SP pools are per-character in the engine (not team-shared), so the
 //   search treats SP as each character's own resource.
 struct SolverResult {

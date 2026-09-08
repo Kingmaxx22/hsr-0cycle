@@ -422,6 +422,8 @@ void SimulationEngine::applyActionEffects(
     EnemyState* target,
     const std::string& actionType,
     int currentGlobalAv,
+    int& teamSp,
+    int teamMaxSp,
     std::vector<ActionEvent>& timeline) {
 
     (void)enemies;
@@ -483,30 +485,34 @@ void SimulationEngine::applyActionEffects(
         event.damageDealt = 0;
     }
 
-    // SP changes. Heal/Shield cost SP like Skill (fallback convention:
-    // per-action SP costs are character data in the Sec 22 DB milestone).
-    // Memosprite actions use their own summon resource: no SP change
-    // (documented default; not guessed as a Skill-cost action).
+    // SP changes. SP is a single shared TEAM pool (Milestone 1.4): every
+    // character draws from and contributes to the same pool, capped by the
+    // configured team max. Heal/Shield cost SP like Skill (fallback
+    // convention: per-action SP costs are character data in the Sec 22 DB
+    // milestone). Memosprite actions use their own summon resource: no SP
+    // change (documented default; not guessed as a Skill-cost action).
     if (actionType == "Basic") {
         event.spChange = 1;
-        charState.sp = std::min(charState.sp + 1, charState.config.maxSp);
+        teamSp = std::min(teamSp + 1, teamMaxSp);
     } else if (actionType == "Skill" || isSupport) {
         event.spChange = -1;
-        charState.sp = std::max(charState.sp - 1, 0);
+        teamSp = std::max(teamSp - 1, 0);
     } else {
         event.spChange = 0;
     }
 
     // Energy gain: parsed per-skill value wins when positive (scaled by
-    // Energy Regen like the default); Ult already had the energy to fire.
+    // Energy Regen like the default). Firing an Ult spends the full bar.
     float energyGain;
     if (tuning != nullptr && tuning->energyGain > 0.0)
         energyGain = static_cast<float>(tuning->energyGain) *
             static_cast<float>(1.0 + std::max(0.0, charState.config.energyRegen));
     else
         energyGain = 20.0f * static_cast<float>(1.0 + std::max(0.0, charState.config.energyRegen));
-    if (actionType == "Ult") energyGain = 0.0f;
-    charState.energy = std::min(charState.energy + energyGain, charState.config.maxEnergy);
+    if (actionType == "Ult")
+        charState.energy = 0.0f;
+    else
+        charState.energy = std::min(charState.energy + energyGain, charState.config.maxEnergy);
 
     if (!isSupport && target != nullptr) {
         // Primary-target toughness: parsed DB value wins when positive,
@@ -756,12 +762,22 @@ SimulationResult SimulationEngine::runSimulation(
     }
 
     // Initialize persistent combat state (Sec 21.6).
+    // SP is a single shared TEAM pool (Milestone 1.4): every character
+    // draws from and contributes to one pool, capped by the configured
+    // max. Per-character SP fields are ignored at runtime; the pool's
+    // starting value/max come from the first character's config.
     std::vector<CharState> charStates;
+    int teamSp = 0;
+    int teamMaxSp = 5;
+    if (!characters.empty()) {
+        teamSp = characters[0].currentSp;
+        teamMaxSp = std::max(0, characters[0].maxSp);
+    }
+    teamSp = std::max(0, std::min(teamSp, teamMaxSp));
     for (const auto& config : characters) {
         CharState state;
         state.config = config;
         state.actionIndex = 0;
-        state.sp = config.currentSp;
         state.energy = config.energy;
         // Live HP pool for heal targeting (clamped: a 0-HP actor is nonsense).
         state.currentHp = std::max(1, static_cast<int>(std::lround(effectiveStat(config, "hp"))));
@@ -966,7 +982,7 @@ SimulationResult SimulationEngine::runSimulation(
                 }
             }
 
-            if (hasSkillInRotation && actingChar.sp >= 1 && actingChar.energy >= actingChar.config.maxEnergy * 0.5f) {
+            if (hasSkillInRotation && teamSp >= 1 && actingChar.energy >= actingChar.config.maxEnergy * 0.5f) {
                 actionToTake = "Skill";
             } else {
                 actionToTake = "Basic";
@@ -989,14 +1005,23 @@ SimulationResult SimulationEngine::runSimulation(
 
         // Check if we can actually perform the action (SP check for
         // SP-costing actions; the auto-AI only picks Basic/Skill).
+        // SP is a shared team pool (Milestone 1.4): any ally's cost draws
+        // from the same pool, and any ally's Basic refills it.
         if ((actionToTake == "Skill" || actionToTake == "Heal" ||
-             actionToTake == "Shield") && actingChar.sp < 1) {
+             actionToTake == "Shield") && teamSp < 1) {
             actionToTake = "Basic"; // Fallback to basic if no SP
+        }
+        // Milestone 1.5: Ult requires a full energy bar; otherwise the
+        // rotation falls back to Basic (same precedent as the SP check).
+        if (actionToTake == "Ult" &&
+            actingChar.energy < actingChar.config.maxEnergy) {
+            actionToTake = "Basic"; // Fallback to basic if no energy
         }
 
         // Apply action effects
         size_t actorIdx = static_cast<size_t>(actingCharIdx);
-        applyActionEffects(charStates, actorIdx, enemyStates, target, actionToTake, currentGlobalAv, result.timeline);
+        applyActionEffects(charStates, actorIdx, enemyStates, target, actionToTake, currentGlobalAv,
+                           teamSp, teamMaxSp, result.timeline);
 
         // Update totals (damage actions only — Spawn events carry no damage).
         // Splash hits count toward total damage/break (multi-target, Phase 2).
@@ -1061,9 +1086,14 @@ SimulationResult SimulationEngine::runSimulation(
         result.totalCycles = (currentGlobalAv + 14999) / 15000;
     }
 
-    // Store final stats (single source of truth: effective values)
+    // Store final stats (single source of truth: effective values).
+    // SP is a shared team pool (Milestone 1.4): every character's _sp key
+    // reports the same pool value, and team_sp/team_max_sp give the pool
+    // directly. Per-character SP is no longer tracked separately.
+    result.finalStats["team_sp"] = teamSp;
+    result.finalStats["team_max_sp"] = teamMaxSp;
     for (const auto& state : charStates) {
-        result.finalStats[state.config.id + "_sp"] = state.sp;
+        result.finalStats[state.config.id + "_sp"] = teamSp;
         result.finalStats[state.config.id + "_energy"] = static_cast<int>(state.energy);
         result.finalStats[state.config.id + "_hp"] =
             static_cast<int>(std::lround(effectiveStat(state.config, "hp")));
