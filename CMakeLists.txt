@@ -11,3 +11,6 @@ set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 add_subdirectory(raylib EXCLUDE_FROM_ALL)
 
 add_subdirectory(ui)
+
+enable_testing()
+add_subdirectory(tests)
