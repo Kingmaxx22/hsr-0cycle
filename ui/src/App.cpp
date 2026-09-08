@@ -106,9 +106,8 @@ static hsr::CharacterConfig BuildSimCharacter(
 
     if (charactersScreen != nullptr && charactersScreen->isManualStatsMode())
     {
-        CharactersScreen::ManualConfig manual = charactersScreen->getManualConfig();
-        if (manual.characterId == info.id &&
-            (manual.hp + manual.atk + manual.def + manual.spd) > 0)
+        CharactersScreen::ManualConfig manual;
+        if (charactersScreen->getManualConfigFor(info.id, manual))
         {
             loadout::applyManualToCharacterConfig(
                 config, info.id, info.name,

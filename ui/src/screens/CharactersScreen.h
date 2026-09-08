@@ -9,6 +9,7 @@
 #include "../data/LoadoutResolver.h"
 
 #include <array>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -51,9 +52,11 @@ public:
     // Returns the currently selected workflow mode
     bool isManualStatsMode() const { return m_manualStatsMode; }
 
-    // Parsed manual stats (Enter Completed Character workflow).
-    // Values are committed from the text buffers on ENTER / focus change.
-    ManualConfig getManualConfig() const { return m_manualConfig; }
+    // Parsed manual stats (Enter Completed Character workflow), one entry
+    // per character. Values commit from the text buffers on ENTER / focus
+    // change for the grid-selected character.
+    bool getManualConfigFor(const std::string& characterId,
+                            ManualConfig& out) const;
 
 private:
     // --- Build from Components workflow ---
@@ -164,8 +167,10 @@ private:
     // Component config (for build workflow)
     ComponentConfig m_componentConfig;
 
-    // Manual config (for enter completed workflow)
-    ManualConfig m_manualConfig;
+    // Manual configs (Enter Completed Character workflow), keyed by
+    // character id. The manual tab edits the grid-selected character's
+    // entry; empty selection edits nothing.
+    std::map<std::string, ManualConfig> m_manualConfigs;
 
     // Raw text buffers for the manual fields (Sec 22.4).
     // 0 HP, 1 ATK, 2 DEF, 3 SPD (integers); 4 CRIT%, 5 CRIT DMG%,

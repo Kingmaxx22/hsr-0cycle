@@ -424,23 +424,53 @@ double CharactersScreen::parsePercentText(const std::string& text)
 
 void CharactersScreen::commitManualTexts()
 {
-    m_manualConfig.hp = parseStatText(m_manualTexts[0]);
-    m_manualConfig.atk = parseStatText(m_manualTexts[1]);
-    m_manualConfig.def = parseStatText(m_manualTexts[2]);
-    m_manualConfig.spd = parseStatText(m_manualTexts[3]);
-    m_manualConfig.critRate = parsePercentText(m_manualTexts[4]);
-    m_manualConfig.critDmg = parsePercentText(m_manualTexts[5]);
-    m_manualConfig.elemDmg = parsePercentText(m_manualTexts[6]);
-    m_manualConfig.resPen = parsePercentText(m_manualTexts[7]);
-    m_manualConfig.ehr = parsePercentText(m_manualTexts[8]);
-    m_manualConfig.effectRes = parsePercentText(m_manualTexts[9]);
+    if (m_selectedCharacterId.empty())
+        return;
+    auto& mc = m_manualConfigs[m_selectedCharacterId];
+    mc.characterId = m_selectedCharacterId;
+    mc.hp = parseStatText(m_manualTexts[0]);
+    mc.atk = parseStatText(m_manualTexts[1]);
+    mc.def = parseStatText(m_manualTexts[2]);
+    mc.spd = parseStatText(m_manualTexts[3]);
+    mc.critRate = parsePercentText(m_manualTexts[4]);
+    mc.critDmg = parsePercentText(m_manualTexts[5]);
+    mc.elemDmg = parsePercentText(m_manualTexts[6]);
+    mc.resPen = parsePercentText(m_manualTexts[7]);
+    mc.ehr = parsePercentText(m_manualTexts[8]);
+    mc.effectRes = parsePercentText(m_manualTexts[9]);
 }
 
 void CharactersScreen::syncManualCharacterId()
 {
-    // Grid selection pre-fills the manual form's character ID.
-    if (!m_selectedCharacterId.empty())
-        m_manualConfig.characterId = m_selectedCharacterId;
+    // When the grid selection changes, load the existing config (if any)
+    // into the text buffers, or clear them for a fresh character.
+    if (m_selectedCharacterId.empty())
+        return;
+    auto it = m_manualConfigs.find(m_selectedCharacterId);
+    if (it != m_manualConfigs.end())
+    {
+        const auto& mc = it->second;
+        m_manualTexts[0] = mc.hp > 0 ? std::to_string(mc.hp) : "";
+        m_manualTexts[1] = mc.atk > 0 ? std::to_string(mc.atk) : "";
+        m_manualTexts[2] = mc.def > 0 ? std::to_string(mc.def) : "";
+        m_manualTexts[3] = mc.spd > 0 ? std::to_string(mc.spd) : "";
+        m_manualTexts[4] = mc.critRate > 0.0
+            ? std::to_string(static_cast<int>(mc.critRate * 100.0)) : "";
+        m_manualTexts[5] = mc.critDmg > 0.0
+            ? std::to_string(static_cast<int>(mc.critDmg * 100.0)) : "";
+        m_manualTexts[6] = mc.elemDmg > 0.0
+            ? std::to_string(static_cast<int>(mc.elemDmg * 100.0)) : "";
+        m_manualTexts[7] = mc.resPen > 0.0
+            ? std::to_string(static_cast<int>(mc.resPen * 100.0)) : "";
+        m_manualTexts[8] = mc.ehr > 0.0
+            ? std::to_string(static_cast<int>(mc.ehr * 100.0)) : "";
+        m_manualTexts[9] = mc.effectRes > 0.0
+            ? std::to_string(static_cast<int>(mc.effectRes * 100.0)) : "";
+    }
+    else
+    {
+        for (auto& t : m_manualTexts) t.clear();
+    }
 }
 
 Rectangle CharactersScreen::searchClearButtonBounds() const
@@ -1208,8 +1238,10 @@ void CharactersScreen::draw()
         DrawText("ENTER COMPLETED CHARACTER", 310, static_cast<int>(modeContentY), 18, WHITE);
         DrawText("Type final combat stats. Percent fields take percent-numbers (70 = 70%).", 312, static_cast<int>(modeContentY + 25), 14, LIGHTGRAY);
 
+        // Character ID label from per-character manual map.
+        auto manualIt = m_manualConfigs.find(m_selectedCharacterId);
         std::string charIdLabel = "Character: " +
-            (m_manualConfig.characterId.empty() ? "(select from grid above)" : m_manualConfig.characterId);
+            (m_selectedCharacterId.empty() ? "(select from grid above)" : m_selectedCharacterId);
         DrawText(charIdLabel.c_str(), 310, static_cast<int>(modeContentY + 48), 14, LIGHTGRAY);
 
         const char* fieldNames[kManualFieldCount] = {
@@ -1241,21 +1273,35 @@ void CharactersScreen::draw()
         }
 
         int summaryY = static_cast<int>(manualFieldBounds(9).y + 38.0f);
-        std::string summary = "Manual: HP " + std::to_string(m_manualConfig.hp) +
-            " ATK " + std::to_string(m_manualConfig.atk) +
-            " DEF " + std::to_string(m_manualConfig.def) +
-            " SPD " + std::to_string(m_manualConfig.spd);
+        const auto& mc = (manualIt != m_manualConfigs.end()) ? manualIt->second : ManualConfig{};
+        std::string summary = "Manual: HP " + std::to_string(mc.hp) +
+            " ATK " + std::to_string(mc.atk) +
+            " DEF " + std::to_string(mc.def) +
+            " SPD " + std::to_string(mc.spd);
         DrawText(summary.c_str(), 310, summaryY, 13, YELLOW);
-        std::string summary2 = "CRIT " + std::to_string(static_cast<int>(m_manualConfig.critRate * 100.0)) +
-            "%/" + std::to_string(static_cast<int>(m_manualConfig.critDmg * 100.0)) +
-            "% DMG " + std::to_string(static_cast<int>(m_manualConfig.elemDmg * 100.0)) +
-            "% PEN " + std::to_string(static_cast<int>(m_manualConfig.resPen * 100.0)) +
-            "% EHR " + std::to_string(static_cast<int>(m_manualConfig.ehr * 100.0)) + "%";
+        std::string summary2 = "CRIT " + std::to_string(static_cast<int>(mc.critRate * 100.0)) +
+            "%/" + std::to_string(static_cast<int>(mc.critDmg * 100.0)) +
+            "% DMG " + std::to_string(static_cast<int>(mc.elemDmg * 100.0)) +
+            "% PEN " + std::to_string(static_cast<int>(mc.resPen * 100.0)) +
+            "% EHR " + std::to_string(static_cast<int>(mc.ehr * 100.0)) + "%";
         DrawText(summary2.c_str(), 310, summaryY + 18, 13, YELLOW);
     }
 
     // --- Selection prompt (input itself is handled in update()) ---
     DrawText("Click a portrait or press ENTER to select, ESC to return", 310, GetScreenHeight() - 50, 16, GRAY);
+}
+
+bool CharactersScreen::getManualConfigFor(const std::string& characterId,
+                                          ManualConfig& out) const
+{
+    auto it = m_manualConfigs.find(characterId);
+    if (it == m_manualConfigs.end())
+        return false;
+    const auto& mc = it->second;
+    if (mc.hp + mc.atk + mc.def + mc.spd <= 0)
+        return false;
+    out = mc;
+    return true;
 }
 
 bool CharactersScreen::consumeSelection(std::string& outCharacterId)
