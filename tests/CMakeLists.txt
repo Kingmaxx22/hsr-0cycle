@@ -90,3 +90,10 @@ hsr_add_test(test_passives
     ${CMAKE_SOURCE_DIR}/ui/src/data/Relicsetdatabase.cpp
     ${CMAKE_SOURCE_DIR}/ui/src/data/LoadoutResolver.cpp
 )
+
+# End-to-end pipeline: full engine run with structural invariants.
+hsr_add_test(test_e2e
+    test_e2e.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)
