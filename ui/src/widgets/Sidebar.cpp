@@ -10,9 +10,10 @@ namespace
         "ENEMIES",
         "ROTATION",
         "SIMULATE",
-        "RULES"
+        "RULES",
+        "SCALING"
     };
-    constexpr int kNavCount = 8;
+    constexpr int kNavCount = 9;
 }
 
 int Sidebar::itemCount()

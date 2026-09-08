@@ -61,6 +61,10 @@ bool App::initialize()
         std::make_unique<SimulationScreen>(assets, enemies);
     simulationScreen->initialize();
 
+    scalingScreen =
+        std::make_unique<ScalingTablesScreen>(assets, characters, loadouts);
+    scalingScreen->initialize();
+
     return true;
 }
 
@@ -220,6 +224,13 @@ void App::goToCharactersScreen()
     activeNav = 1;
 }
 
+void App::goToScalingScreen()
+{
+    scalingScreen->setTeamContext(teamBuilder->getTeam());
+    activeView = ActiveView::Scaling;
+    activeNav = 8;
+}
+
 void App::run()
 {
     while (!WindowShouldClose())
@@ -235,6 +246,7 @@ void App::run()
             case ActiveView::LightCone:   lightConeScreen->update(dt); break;
             case ActiveView::Enemies:     enemiesScreen->update(dt); break;
             case ActiveView::Simulation:  simulationScreen->update(dt); break;
+            case ActiveView::Scaling:     scalingScreen->update(dt); break;
         }
 
         BeginDrawing();
@@ -274,6 +286,10 @@ void App::run()
             // ROTATION (5) and SIMULATE (6) share the simulation view:
             // rotation editing lives inside SimulationScreen.
             goToSimulationScreen(navClick);
+        }
+        else if (navClick == 8)
+        {
+            goToScalingScreen();
         }
         else if (navClick >= 0)
         {
@@ -363,6 +379,16 @@ void App::run()
                     activeNav = 0;
                 }
                 break;
+
+            case ActiveView::Scaling:
+                scalingScreen->draw();
+
+                if (scalingScreen->consumeBackRequest())
+                {
+                    activeView = ActiveView::TeamBuilder;
+                    activeNav = 0;
+                }
+                break;
         }
 
         EndDrawing();
@@ -371,6 +397,7 @@ void App::run()
 
 void App::shutdown()
 {
+    scalingScreen.reset();
     simulationScreen.reset();
     enemiesScreen.reset();
     lightConeScreen.reset();

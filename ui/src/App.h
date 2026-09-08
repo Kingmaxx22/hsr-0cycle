@@ -15,6 +15,7 @@
 #include "screens/LightConeScreen.h"
 #include "screens/EnemiesScreen.h"
 #include "screens/SimulationScreen.h"
+#include "screens/ScalingTablesScreen.h"
 
 #include <memory>
 #include <string>
@@ -41,7 +42,8 @@ private:
         RelicEditor,
         LightCone,
         Enemies,
-        Simulation
+        Simulation,
+        Scaling
     };
 
     void goToRelicEditor(const std::string& characterId);
@@ -49,6 +51,7 @@ private:
     void goToEnemiesScreen();
     void goToSimulationScreen(int navIndex);
     void goToCharactersScreen();
+    void goToScalingScreen();
 
     AssetManager assets;
     CharacterDatabase characters;
@@ -68,4 +71,5 @@ private:
     std::unique_ptr<LightConeScreen> lightConeScreen;
     std::unique_ptr<EnemiesScreen> enemiesScreen;
     std::unique_ptr<SimulationScreen> simulationScreen;
+    std::unique_ptr<ScalingTablesScreen> scalingScreen;
 };
