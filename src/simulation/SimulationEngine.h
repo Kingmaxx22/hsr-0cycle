@@ -12,14 +12,20 @@
 namespace hsr {
 
 // Represents a single action in the timeline
+struct SplashHit {
+    std::string enemyId;  // Adjacent/AoE/bounce target hit by splash
+    int damageDealt = 0;  // Final damage on this target
+    float breakDamage = 0.0f;
+};
 struct ActionEvent {
     int avCost;             // AV cost of this action (e.g., 10000 / SPD)
     int currentAv;          // Cumulative AV when this action happens
     std::string characterId;
     std::string characterName;
-    std::string actionType; // "Basic", "Skill", "Ult", "FUA", "Heal", "Shield", "Spawn"
-    std::string targetEnemyId; // Enemy instance hit ("" for non-damage events)
-    int damageDealt;        // Final damage from the Section 1 master formula
+    std::string actionType; // "Basic", "Skill", "Ult", "FUA", "Memosprite", "Heal", "Shield", "Spawn"
+    std::string targetEnemyId; // Primary enemy instance hit ("" for non-damage events)
+    int damageDealt;        // Final damage on the PRIMARY target
+    std::vector<SplashHit> splashHits; // Blast-adjacent / AoE / bounce hits
     int spChange;           // SP generated/consumed
     float breakDamage;      // Break (+ super break) damage dealt
     float superBreakDamage = 0.0f; // Super Break portion (also in breakDamage)
@@ -142,8 +148,16 @@ struct CharacterConfig {
     // heal/shield multipliers). No values are guessed into the DB.
     struct SkillActionTuning {
         int toughnessDamage = 0;   // 0 = fallback tier
+        int toughnessAdjacent = 0; // Adjacent-target toughness (Blast "+ N")
         double healMultiplier = 0.0;   // 0 = single healMultiplier field
         double shieldMultiplier = 0.0; // 0 = single shieldMultiplier field
+        double energyGain = 0.0;       // 0 = engine default (20 x regen)
+        double damageMultiplier = 0.0; // 0 = configured basic/skill/ult/fua
+        double adjacentMultiplier = 0.0; // 0 = primary multiplier for splash
+        int bounceHits = 0;            // Bounce extra instances (0 = none)
+        // Targeting: "" (single fallback), "Single Target", "Blast",
+        // "AoE", "Bounce".
+        std::string targetType;
     };
     std::map<std::string, SkillActionTuning> skillActions;
 };
@@ -310,7 +324,8 @@ private:
     // Builds the Section 1 master-formula result for one hit (Sec 21.4),
     // filling intermediates for display. Returns final damage (rounded).
     int calculateHitDamage(const CharState& charState, const EnemyState& enemyState,
-                           const std::string& actionType, ActionEvent& outEvent);
+                           const std::string& actionType, ActionEvent& outEvent,
+                           double multOverride = 0.0);
     void applyActionEffects(std::vector<CharState>& allies,
                             size_t actorIdx,
                             std::vector<EnemyState>& enemies,
@@ -318,6 +333,16 @@ private:
                             const std::string& actionType,
                             int currentGlobalAv,
                             std::vector<ActionEvent>& timeline);
+    // One hit (primary or splash) against a single enemy: master-formula
+    // damage into ev.damageDealt, HP/toughness/break/super-break/exo state
+    // updates, break portion into ev.breakDamage. Caller aggregates.
+    void applyHitToEnemy(CharState& charState,
+                         EnemyState& target,
+                         const std::string& actionType,
+                         const CharacterConfig::SkillActionTuning* tuning,
+                         double multOverride,
+                         int toughnessOverride,
+                         ActionEvent& ev);
     // Enemy turn: recovery when broken, otherwise an attack on the lowest-
     // HP-fraction living ally. Shields absorb first; overflow hits HP.
     // Returns true if the party was wiped by this action.

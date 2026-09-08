@@ -24,6 +24,8 @@ int SimulationEngine::calculateActionCost(int speed, const std::string& actionTy
         return 0; // Ultimate is instant, doesn't consume turn
     } else if (actionType == "FUA") {
         return 0; // Follow-up attack is instant
+    } else if (actionType == "Memosprite") {
+        return baseAv; // Memosprite summon action consumes a full turn
     }
 
     return baseAv;
@@ -75,15 +77,24 @@ double SimulationEngine::effectiveStat(const CharacterConfig& config, const std:
 int SimulationEngine::calculateHitDamage(const CharState& charState,
                                          const EnemyState& enemyState,
                                          const std::string& actionType,
-                                         ActionEvent& outEvent) {
+                                         ActionEvent& outEvent,
+                                         double multOverride) {
     const CharacterConfig& c = charState.config;
 
     // Section 2: skill multiplier + scaling attribute from the single
     // source of truth (entered finals or component-built totals).
+    // Phase 1: parsed per-skill multiplier wins when positive.
     double skillMult = c.basicMultiplier;
     if (actionType == "Skill") skillMult = c.skillMultiplier;
     else if (actionType == "Ult") skillMult = c.ultMultiplier;
     else if (actionType == "FUA") skillMult = c.fuaMultiplier;
+    if (multOverride > 0.0)
+        skillMult = multOverride;
+    else {
+        auto it = c.skillActions.find(actionType);
+        if (it != c.skillActions.end() && it->second.damageMultiplier > 0.0)
+            skillMult = it->second.damageMultiplier;
+    }
 
     double scalingValue = effectiveStat(c, c.scalingStat);
     if (c.scalingStat == "atk")
@@ -326,12 +337,16 @@ void SimulationEngine::applyActionEffects(
             event.shieldAmount = static_cast<float>(shield);
         }
     } else {
-        // Section 1 master formula via the implemented Sections 2-8/11 stages.
-        event.damageDealt = calculateHitDamage(charState, *target, actionType, event);
+        // Damage path is resolved per-target below (primary + splash), so
+        // nothing is computed here. event.damageDealt is filled by the
+        // primary hit in the target loop.
+        event.damageDealt = 0;
     }
 
     // SP changes. Heal/Shield cost SP like Skill (fallback convention:
     // per-action SP costs are character data in the Sec 22 DB milestone).
+    // Memosprite actions use their own summon resource: no SP change
+    // (documented default; not guessed as a Skill-cost action).
     if (actionType == "Basic") {
         event.spChange = 1;
         charState.sp = std::min(charState.sp + 1, charState.config.maxSp);
@@ -342,47 +357,123 @@ void SimulationEngine::applyActionEffects(
         event.spChange = 0;
     }
 
-    // Energy gain (Ult already had the energy to fire), scaled by
-    // Energy Regen rope stat (Q1 live behavior).
-    float energyGain = 20.0f * static_cast<float>(1.0 + std::max(0.0, charState.config.energyRegen));
+    // Energy gain: parsed per-skill value wins when positive (scaled by
+    // Energy Regen like the default); Ult already had the energy to fire.
+    float energyGain;
+    if (tuning != nullptr && tuning->energyGain > 0.0)
+        energyGain = static_cast<float>(tuning->energyGain) *
+            static_cast<float>(1.0 + std::max(0.0, charState.config.energyRegen));
+    else
+        energyGain = 20.0f * static_cast<float>(1.0 + std::max(0.0, charState.config.energyRegen));
     if (actionType == "Ult") energyGain = 0.0f;
     charState.energy = std::min(charState.energy + energyGain, charState.config.maxEnergy);
 
     if (!isSupport && target != nullptr) {
-        // Apply damage to the target enemy
-        target->currentHp = std::max(0, target->currentHp - event.damageDealt);
-
-        // Toughness damage: per-skill DB value wins when present and
-        // positive; otherwise the documented fallback tiers.
-        int toughnessDamage = 20;
+        // Primary-target toughness: parsed DB value wins when positive,
+        // otherwise the documented fallback tiers.
+        int primaryToughness = 20;
         if (tuning != nullptr && tuning->toughnessDamage > 0) {
-            toughnessDamage = tuning->toughnessDamage;
-        } else if (actionType == "Basic") toughnessDamage = 10;
-        else if (actionType == "Skill") toughnessDamage = 20;
-        else if (actionType == "Ult") toughnessDamage = 30;
-        else if (actionType == "FUA") toughnessDamage = 10;
+            primaryToughness = tuning->toughnessDamage;
+        } else if (actionType == "Basic") primaryToughness = 10;
+        else if (actionType == "Skill") primaryToughness = 20;
+        else if (actionType == "Ult") primaryToughness = 30;
+        else if (actionType == "FUA") primaryToughness = 10;
+        else if (actionType == "Memosprite") primaryToughness = 10;
 
-        const CharacterConfig& c = charState.config;
-        if (event.damageDealt > 0 && !target->broken) {
-            target->currentToughness = std::max(0, target->currentToughness - toughnessDamage);
-            if (target->currentToughness == 0) {
-                if (target->barIndex + 1 < target->bars.size()) {
-                    // Non-final layer (wiki multi-layered toughness): Break
-                    // DMG only — no delay, no debuff, no broken state.
-                    event.breakDamage = computeBreakEvent(
-                        c, *target,
-                        static_cast<double>(target->bars[target->barIndex]));
-                    target->barIndex++;
-                    target->currentToughness = target->bars[target->barIndex];
-                } else {
-                    // Final bar: full Weakness Break event.
-                    event.breakDamage = computeBreakEvent(
-                        c, *target,
-                        static_cast<double>(target->bars[target->barIndex]));
-                    target->broken = true;
+        // Primary-target multiplier override (0 = configured multipliers).
+        double primaryMult = (tuning != nullptr) ? tuning->damageMultiplier : 0.0;
+        // Splash multiplier: parsed adjacent value wins, otherwise the
+        // primary multiplier (documented fallback; never guessed).
+        double splashMult = (tuning != nullptr && tuning->adjacentMultiplier > 0.0)
+            ? tuning->adjacentMultiplier : primaryMult;
+
+        // Primary hit fills event.damageDealt / event.breakDamage.
+        applyHitToEnemy(charState, *target, actionType, tuning,
+                        primaryMult, primaryToughness, event);
+
+        // Splash resolution by parsed target type (data-driven, Sec 21).
+        std::string tt = (tuning != nullptr) ? tuning->targetType : "";
+        if (tt == "Blast" || tt == "AoE" || tt == "Bounce") {
+            int splashToughness = primaryToughness;
+            if (tt == "Blast" && tuning != nullptr)
+                splashToughness = tuning->toughnessAdjacent;
+            int bounceLeft = (tuning != nullptr) ? tuning->bounceHits : 0;
+            for (auto& e : enemies) {
+                if (&e == target || !e.active || e.currentHp <= 0)
+                    continue;
+                if (tt == "Blast") {
+                    // Adjacent = slot-neighbors (slot +- 1), per the data's
+                    // "to adjacent targets" wording and HSR Blast semantics.
+                    int d = e.config.slotIndex - target->config.slotIndex;
+                    if (d != 1 && d != -1)
+                        continue;
+                } else if (tt == "Bounce") {
+                    // Deterministic slot-order bounce (random in game).
+                    if (bounceLeft <= 0)
+                        continue;
+                    --bounceLeft;
                 }
+                // AoE: every other active, living enemy.
+                ActionEvent splashEv;
+                applyHitToEnemy(charState, e, actionType, tuning,
+                                splashMult, splashToughness, splashEv);
+                SplashHit hit;
+                hit.enemyId = e.config.id;
+                hit.damageDealt = splashEv.damageDealt;
+                hit.breakDamage = splashEv.breakDamage;
+                event.splashHits.push_back(hit);
+                event.breakDamage += splashEv.breakDamage;
+                if (e.currentHp <= 0)
+                    e.active = false;
             }
-        } else if (event.damageDealt > 0 && target->broken) {
+        }
+    }
+
+    timeline.push_back(event);
+}
+
+// One hit (primary or splash) against a single enemy.
+void SimulationEngine::applyHitToEnemy(
+    CharState& charState,
+    EnemyState& target,
+    const std::string& actionType,
+    const CharacterConfig::SkillActionTuning* tuning,
+    double multOverride,
+    int toughnessDamage,
+    ActionEvent& ev) {
+    (void)tuning;
+    ev.damageDealt = 0;
+    ev.breakDamage = 0.0f;
+    ev.superBreakDamage = 0.0f;
+
+    // Section 1 master formula via the implemented Sections 2-8/11 stages.
+    ev.damageDealt = calculateHitDamage(charState, target, actionType, ev,
+                                        multOverride);
+
+    // Apply damage to the target enemy
+    target.currentHp = std::max(0, target.currentHp - ev.damageDealt);
+
+    const CharacterConfig& c = charState.config;
+    if (ev.damageDealt > 0 && !target.broken) {
+        target.currentToughness = std::max(0, target.currentToughness - toughnessDamage);
+        if (target.currentToughness == 0) {
+            if (target.barIndex + 1 < target.bars.size()) {
+                // Non-final layer (wiki multi-layered toughness): Break
+                // DMG only — no delay, no debuff, no broken state.
+                ev.breakDamage = computeBreakEvent(
+                    c, target,
+                    static_cast<double>(target.bars[target.barIndex]));
+                target.barIndex++;
+                target.currentToughness = target.bars[target.barIndex];
+            } else {
+                // Final bar: full Weakness Break event.
+                ev.breakDamage = computeBreakEvent(
+                    c, target,
+                    static_cast<double>(target.bars[target.barIndex]));
+                target.broken = true;
+            }
+        }
+    } else if (ev.damageDealt > 0 && target.broken) {
             // Super Break (documented simplification): attacker converts
             // toughness damage dealt to the broken enemy while Exo also
             // depletes independently below. Trigger rules: modifier gate,
@@ -407,32 +498,29 @@ void SimulationEngine::applyActionEffects(
                 double superBreak = damage::calculateSuperBreakDamage(
                     effectiveTough,
                     c.breakEffect, c.superBreakModifier,
-                    event.damageBreakdown.defenseMultiplier,
-                    event.damageBreakdown.resistanceMultiplier,
-                    event.damageBreakdown.vulnerabilityMultiplier,
+                    ev.damageBreakdown.defenseMultiplier,
+                    ev.damageBreakdown.resistanceMultiplier,
+                    ev.damageBreakdown.vulnerabilityMultiplier,
                     damage::calculateUniversalDamageReductionMultiplier(uniBroken));
                 int superAmount = std::max(0, static_cast<int>(std::lround(superBreak)));
-                event.superBreakDamage = static_cast<float>(superAmount);
-                event.breakDamage += event.superBreakDamage;
-                target->currentHp = std::max(0, target->currentHp - superAmount);
+                ev.superBreakDamage = static_cast<float>(superAmount);
+                ev.breakDamage += ev.superBreakDamage;
+                target.currentHp = std::max(0, target.currentHp - superAmount);
             }
             // Exo-Toughness (wiki): any further hits deplete it; at zero it
             // triggers a second full break event, then stays spent.
-            if (target->currentExo > 0) {
-                target->currentExo = std::max(0, target->currentExo - toughnessDamage);
-                if (target->currentExo == 0 && !target->exoSpent) {
-                    target->exoSpent = true;
-                    event.breakDamage += computeBreakEvent(
-                        c, *target,
-                        static_cast<double>(target->config.exoToughness));
+            if (target.currentExo > 0) {
+                target.currentExo = std::max(0, target.currentExo - toughnessDamage);
+                if (target.currentExo == 0 && !target.exoSpent) {
+                    target.exoSpent = true;
+                    ev.breakDamage += computeBreakEvent(
+                        c, target,
+                        static_cast<double>(target.config.exoToughness));
                 }
             }
         }
-        if (target->currentHp <= 0)
-            target->active = false;
-    }
-
-    timeline.push_back(event);
+        if (target.currentHp <= 0)
+            target.active = false;
 }
 
 bool SimulationEngine::allEnemiesDefeated(const std::vector<EnemyState>& enemies, int avLimit) {
@@ -698,9 +786,12 @@ SimulationResult SimulationEngine::runSimulation(
         size_t actorIdx = static_cast<size_t>(actingCharIdx);
         applyActionEffects(charStates, actorIdx, enemyStates, target, actionToTake, currentGlobalAv, result.timeline);
 
-        // Update totals (damage actions only — Spawn events carry no damage)
+        // Update totals (damage actions only — Spawn events carry no damage).
+        // Splash hits count toward total damage/break (multi-target, Phase 2).
         result.totalActions++;
         result.totalDamage += result.timeline.back().damageDealt;
+        for (const auto& splash : result.timeline.back().splashHits)
+            result.totalDamage += splash.damageDealt;
         result.totalBreakDamage += result.timeline.back().breakDamage;
 
         // Schedule the next turn: base cost, then Section 17 advance.
