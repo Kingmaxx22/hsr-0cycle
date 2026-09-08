@@ -705,7 +705,8 @@ std::vector<SimulationEngine::SpeedBreakpoint> SimulationEngine::calculateBreakp
 SimulationResult SimulationEngine::runSimulation(
     const std::vector<CharacterConfig>& characters,
     const EncounterConfig& encounter,
-    int avLimit) {
+    int avLimit,
+    int maxActions) {
 
     SimulationResult result;
     result.success = false;
@@ -767,6 +768,8 @@ SimulationResult SimulationEngine::runSimulation(
     }
 
     int currentGlobalAv = 0;
+    int actionCount = 0;
+    const int actionCap = std::max(1, maxActions);
 
     // Main simulation loop - process actions in AV order.
     while (currentGlobalAv <= avLimit) {
@@ -831,6 +834,14 @@ SimulationResult SimulationEngine::runSimulation(
         }
 
         if (actingCharIdx == -1 && actingEnemyIdx == -1) break;
+
+        if (++actionCount > actionCap) {
+            result.success = false;
+            result.errorMessage =
+                "Action cap exceeded (possible zero-cost loop)";
+            result.totalCycles = (currentGlobalAv + 14999) / 15000;
+            break;
+        }
 
         if (actingEnemyIdx >= 0) {
             // ---- Enemy turn (offense / recovery) ----
@@ -1018,11 +1029,12 @@ SimulationResult SimulationEngine::runSimulation(
 SimulationResult SimulationEngine::runSimulation(
     const std::vector<CharacterConfig>& characters,
     const EnemyConfig& enemy,
-    int avLimit) {
+    int avLimit,
+    int maxActions) {
 
     EncounterConfig encounter;
     encounter.slots[0].push_back(enemy);
-    return runSimulation(characters, encounter, avLimit);
+    return runSimulation(characters, encounter, avLimit, maxActions);
 }
 
 } // namespace hsr

@@ -274,17 +274,22 @@ public:
     ~SimulationEngine();
     // Core Simulation
     // Multi-enemy encounter entry point (Sec 21.3/21.6).
+    // maxActions bounds total actor turns (anti-hang backstop for
+    // zero-cost loops; legit sims use hundreds). Exceeding it fails the
+    // run with an explicit error, never a hang.
     SimulationResult runSimulation(
         const std::vector<CharacterConfig>& characters,
         const EncounterConfig& encounter,
-        int avLimit = 15000 // 150.00 AV (using integer math for precision)
+        int avLimit = 15000, // 150.00 AV (using integer math for precision)
+        int maxActions = 10000
     );
 
     // Single-enemy convenience overload (wraps the enemy into slot 0).
     SimulationResult runSimulation(
         const std::vector<CharacterConfig>& characters,
         const EnemyConfig& enemy,
-        int avLimit = 15000
+        int avLimit = 15000,
+        int maxActions = 10000
     );
 
     // Helper to calculate speed breakpoints

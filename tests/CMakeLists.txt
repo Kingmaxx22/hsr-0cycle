@@ -46,6 +46,14 @@ hsr_add_test(test_eidolons
     ${CMAKE_SOURCE_DIR}/ui/src/data/LoadoutResolver.cpp
 )
 
+# Rotation solver: DFS pattern search finds clearing rotations.
+hsr_add_test(test_solver
+    test_solver.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/RotationSolver.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)
+
 # Break-formula verification (research-notes package + boost terms).
 hsr_add_test(test_breakformula
     test_breakformula.cpp
