@@ -3,6 +3,7 @@ add_executable(hsr_ui
     src/App.cpp
     src/assets/AssetManager.cpp
     src/data/CharacterDatabase.cpp
+    src/data/SkillDatabase.cpp
     src/data/LoadoutResolver.cpp
     src/data/Relicsetdatabase.cpp
     src/data/LightConeDatabase.cpp

@@ -4,15 +4,23 @@
 #include <unordered_map>
 #include <vector>
 
-// Per-skill tuning (Sec 22 DB milestone), additive schema:
+// Per-skill tuning (Sec 22 DB milestone + Phase 1 skill data), additive:
 //   "skills": { "basic": {"toughness": 10, "heal": 0.0, "shield": 0.0}, ... }
-// Missing actions/fields mean "use engine fallback" — zeros are never
-// guessed into the data file.
+// Missing actions/fields mean "use engine fallback" - zeros are never
+// guessed into the data file. targetType is one of "", "Single Target",
+// "Blast", "AoE", "Bounce" ("" = single-target fallback).
 struct SkillTuning
 {
     int toughness = 0;
+    int toughnessAdjacent = 0;
     double heal = 0.0;
     double shield = 0.0;
+    double energy = 0.0;
+    double multPrimary = 0.0;
+    double multAdjacent = 0.0;
+    int bounceHits = 0;
+    std::string targetType;
+    std::string scalingStat;
 };
 
 struct CharacterInfo
@@ -23,7 +31,7 @@ struct CharacterInfo
     std::string element;
     std::string path;      // HSR "Path" (Nihility, Harmony, etc.)
     std::unordered_map<std::string, double> baseStats;
-    std::unordered_map<std::string, SkillTuning> skills; // keys: basic/skill/ult/fua
+    std::unordered_map<std::string, SkillTuning> skills; // keys: basic/skill/ult/fua/memosprite
 };
 
 class CharacterDatabase

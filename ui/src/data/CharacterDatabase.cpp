@@ -1,4 +1,5 @@
 #include "CharacterDatabase.h"
+#include "SkillDatabase.h"
 #include "../third_party/json.hpp"
 
 #include <cstdio>
@@ -41,6 +42,11 @@ bool CharacterDatabase::load(const std::string& dataDir)
     characters.clear();
     idIndex.clear();
 
+    // Phase 1: parsed per-skill combat data, loaded once and overlaid per
+    // character below. Best-effort: missing file leaves engine fallbacks.
+    SkillDatabase skillDb;
+    const bool haveSkills = skillDb.load(dataDir);
+
     for (const auto& rec : root["characters"])
     {
         CharacterInfo info;
@@ -71,6 +77,25 @@ bool CharacterDatabase::load(const std::string& dataDir)
                 tuning.heal = data.value("heal", 0.0);
                 tuning.shield = data.value("shield", 0.0);
                 info.skills[action] = tuning;
+            }
+        }
+
+        // Phase 1 overlay: parsed per-skill combat data (toughness, energy,
+        // target type, scaling) keyed by slug == character id.
+        if (haveSkills)
+        {
+            for (const auto& kv : skillDb.skillsFor(info.id))
+            {
+                SkillTuning& tuning = info.skills[kv.first]; // additive
+                const ParsedSkillData& ps = kv.second;
+                if (ps.toughness > 0) tuning.toughness = ps.toughness;
+                tuning.toughnessAdjacent = ps.toughnessAdjacent;
+                if (ps.energy > 0.0) tuning.energy = ps.energy;
+                tuning.multPrimary = ps.multPrimary;
+                tuning.multAdjacent = ps.multAdjacent;
+                tuning.bounceHits = ps.bounceHits;
+                tuning.targetType = ps.targetType;
+                if (!ps.scalingStat.empty()) tuning.scalingStat = ps.scalingStat;
             }
         }
 

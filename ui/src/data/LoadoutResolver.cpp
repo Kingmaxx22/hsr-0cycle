@@ -342,11 +342,18 @@ void applyToCharacterConfig(hsr::CharacterConfig& config,
         else if (kv.first == "skill") action = "Skill";
         else if (kv.first == "ult") action = "Ult";
         else if (kv.first == "fua") action = "FUA";
+        else if (kv.first == "memosprite") action = "Memosprite";
         else continue;
         hsr::CharacterConfig::SkillActionTuning tuning;
         tuning.toughnessDamage = kv.second.toughness;
+        tuning.toughnessAdjacent = kv.second.toughnessAdjacent;
         tuning.healMultiplier = kv.second.heal;
         tuning.shieldMultiplier = kv.second.shield;
+        tuning.energyGain = kv.second.energy;
+        tuning.damageMultiplier = kv.second.multPrimary;
+        tuning.adjacentMultiplier = kv.second.multAdjacent;
+        tuning.bounceHits = kv.second.bounceHits;
+        tuning.targetType = kv.second.targetType;
         config.skillActions[action] = tuning;
     }
 
