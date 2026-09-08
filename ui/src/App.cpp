@@ -170,6 +170,8 @@ static hsr::EncounterConfig BuildEncounter(
             // Phase 4.1: offense targeting from the enemy DB (Single
             // fallback when the CSV has no targeting text for this foe).
             config.offenseTargetType = info->offenseTargetType;
+            // Phase 4.2: enemy Effect RES gates DoT/debuff application.
+            config.effectRes = info->effectRes / 100.0;
             // Per-entry RES override wins over the Q2 auto-rule; negative
             // keeps auto (weakness-first, then map, else 20%).
             if (entry.resOverride >= 0.0)

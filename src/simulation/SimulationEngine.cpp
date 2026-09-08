@@ -5,7 +5,7 @@
 
 namespace hsr {
 
-SimulationEngine::SimulationEngine() {}
+SimulationEngine::SimulationEngine() : m_rng(42) {}
 
 SimulationEngine::~SimulationEngine() {}
 
@@ -197,11 +197,26 @@ bool SimulationEngine::applyEnemyAction(std::vector<CharState>& allies,
     event.characterName = enemy.config.name;
     event.targetEnemyId = enemy.config.id;
     event.currentAv = currentGlobalAv;
+    event.damageDealt = 0;
+    event.breakDamage = 0.0f;
+    event.superBreakDamage = 0.0f;
+    event.spChange = 0;
+    event.critMultiplier = 1.0;
+    event.stackMultiplier = 1.0;
     int enemySpd = 100;
     // Enemy AV cost display: threshold spacing (informational).
     enemySpd = static_cast<int>(std::lround(std::max(1.0, enemy.config.spd)));
     event.avCost = 10000 / std::max(1, enemySpd);
     event.isExtraTurn = false;
+
+    // Phase 4.2: DoT ticks resolve at the start of the enemy's turn,
+    // before recovery/attack. A tick-killed enemy neither recovers nor
+    // attacks (its tick events are already on the timeline).
+    if (!enemy.dots.empty()) {
+        tickEnemyDots(enemy, currentGlobalAv, timeline);
+        if (!enemy.active || enemy.currentHp <= 0)
+            return false;
+    }
 
     if (enemy.broken) {
         // Recovery turn (wiki): the turn is consumed restoring toughness
@@ -264,6 +279,103 @@ bool SimulationEngine::applyEnemyAction(std::vector<CharState>& allies,
             return false;
     }
     return true; // Party wiped.
+}
+
+void SimulationEngine::tryApplyBreakDot(const CharacterConfig& c,
+                                           EnemyState& target,
+                                           ActionEvent& ev) {
+    if (c.breakDotType.empty() || c.breakDotChance <= 0.0 ||
+        c.breakDotTurns <= 0 || c.breakDotAtkScale <= 0.0)
+        return; // Unconfigured: no break DoT (default).
+    // Sec 13: Final Chance = base x (1 - Effect RES) x (1 + EHR), capped.
+    double chance = damage::calculateEffectHitRate(
+        std::clamp(c.breakDotChance, 0.0, 1.0), target.config.effectRes,
+        std::max(0.0, c.ehr), 1);
+    double roll = std::uniform_real_distribution<double>(0.0, 1.0)(m_rng);
+    if (roll >= chance)
+        return; // Resisted.
+    EnemyState::ActiveDot dot;
+    dot.type = c.breakDotType;
+    dot.remainingTicks = c.breakDotTurns;
+    dot.atkScale = c.breakDotAtkScale;
+    // Snapshot source stats (source may die; buffs may change mid-fight).
+    dot.snapshotAtk = effectiveStat(c, c.scalingStat);
+    if (c.scalingStat == "atk")
+        dot.snapshotAtk *= (1.0 + c.buffAtkPct);
+    dot.snapshotLevel = std::max(1, c.level);
+    dot.snapshotElemDmg = c.elementalDmgPct;
+    dot.snapshotAllDmg = c.allTypeDmgPct + c.buffDmgPct;
+    dot.snapshotDotDmg = c.dotDmgPct;
+    dot.snapshotResPen = c.resPen;
+    dot.snapshotElement = c.element;
+    target.dots.push_back(dot);
+    ev.debuffApplied = c.breakDotType;
+}
+
+int SimulationEngine::tickEnemyDots(EnemyState& enemy,
+                                    int currentGlobalAv,
+                                    std::vector<ActionEvent>& timeline) {
+    int total = 0;
+    for (auto& dot : enemy.dots) {
+        if (dot.remainingTicks <= 0)
+            continue;
+        // DoT tick: master-formula stages with includeDotDMG, no crit
+        // (DoTs cannot crit), no stacks. Base = scale x snapshot ATK.
+        damage::MasterDamageConfig dmg;
+        dmg.baseDamageConfig.skillMultiplier = std::max(0.0, dot.atkScale);
+        dmg.baseDamageConfig.scalingAttributeValue = std::max(0.0, dot.snapshotAtk);
+        dmg.dmgPercentMultiplier = 1.0 + dot.snapshotElemDmg +
+            dot.snapshotAllDmg + dot.snapshotDotDmg;
+        dmg.defenseConfig.attackerLevel = dot.snapshotLevel;
+        dmg.defenseConfig.enemyBaseDEF = enemy.config.baseDef;
+        dmg.defenseConfig.shredPercent = enemy.config.defShredTaken;
+        dmg.defenseConfig.isPlightDifficulty = enemy.config.isPlightDifficulty;
+        dmg.resistanceConfig.resistanceType = enemy.config.resistanceType;
+        dmg.resistanceConfig.explicitBaseRES = enemy.config.baseResOverride;
+        if (dmg.resistanceConfig.explicitBaseRES < 0.0 && !dot.snapshotElement.empty())
+            dmg.resistanceConfig.explicitBaseRES = damage::resolveRES(
+                enemy.config.res, enemy.config.weaknesses, dot.snapshotElement);
+        dmg.resistanceConfig.resPenetration =
+            dot.snapshotResPen + enemy.config.resReduction;
+        dmg.damageTakenConfig.elementalDMGTaken = enemy.config.dmgTakenElemental;
+        dmg.damageTakenConfig.allTypeDMGTaken = enemy.config.dmgTakenAll;
+        dmg.universalReductionConfig.isEnemyBroken = enemy.broken;
+        dmg.vulnerabilityConfig.sumVULN = enemy.config.vulnSum;
+        if (enemy.config.specialVuln > 0.0) {
+            dmg.vulnerabilityConfig.vulnType = damage::EnemyVulnerabilityType::Special;
+            dmg.vulnerabilityConfig.specialVulnEnemy = enemy.config.specialVuln;
+        }
+        damage::DamageResult result = damage::calculateOutgoingDamage(dmg);
+        int amount = std::max(0, static_cast<int>(std::lround(result.finalDamage)));
+        enemy.currentHp = std::max(0, enemy.currentHp - amount);
+        --dot.remainingTicks;
+        total += amount;
+
+        ActionEvent tick;
+        tick.characterId = "";
+        tick.characterName = "DoT";
+        tick.actionType = "DotTick";
+        tick.targetEnemyId = enemy.config.id;
+        tick.damageDealt = amount;
+        tick.currentAv = currentGlobalAv;
+        tick.avCost = 0;
+        tick.isExtraTurn = false;
+        tick.debuffApplied = dot.type;
+        tick.damageBreakdown = result;
+        tick.critMultiplier = 1.0;
+        tick.stackMultiplier = 1.0;
+        timeline.push_back(tick);
+    }
+    // Expire spent DoTs.
+    enemy.dots.erase(
+        std::remove_if(enemy.dots.begin(), enemy.dots.end(),
+                       [](const EnemyState::ActiveDot& d) {
+                           return d.remainingTicks <= 0;
+                       }),
+        enemy.dots.end());
+    if (enemy.currentHp <= 0)
+        enemy.active = false;
+    return total;
 }
 
 float SimulationEngine::computeBreakEvent(const CharacterConfig& c, EnemyState& target,
@@ -495,6 +607,8 @@ void SimulationEngine::applyHitToEnemy(
                     c, target,
                     static_cast<double>(target.bars[target.barIndex]));
                 target.broken = true;
+                // Phase 4.2: EHR-gated break DoT (no-op unless configured).
+                tryApplyBreakDot(c, target, ev);
             }
         }
     } else if (ev.damageDealt > 0 && target.broken) {
@@ -723,7 +837,13 @@ SimulationResult SimulationEngine::runSimulation(
             EnemyState& actingEnemy = enemyStates[static_cast<size_t>(actingEnemyIdx)];
             currentGlobalAv = actingEnemy.currentAv;
             if (currentGlobalAv > avLimit) break;
+            size_t timelineBefore = result.timeline.size();
             bool wiped = applyEnemyAction(charStates, actingEnemy, currentGlobalAv, result.timeline);
+            // Phase 4.2: DoT tick damage counts toward totals.
+            for (size_t i = timelineBefore; i < result.timeline.size(); ++i) {
+                if (result.timeline[i].actionType == "DotTick")
+                    result.totalDamage += result.timeline[i].damageDealt;
+            }
             actingEnemy.currentAv += enemyAvCost(actingEnemy.config.spd);
             if (wiped) {
                 result.partyWiped = true;

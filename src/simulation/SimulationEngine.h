@@ -8,6 +8,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <random>
 
 namespace hsr {
 
@@ -36,6 +37,7 @@ struct ActionEvent {
     std::string targetAllyId; // Ally hit by enemy offense
     float shieldAbsorbed = 0.0f; // Incoming damage stopped by shield
     bool isExtraTurn;       // True if caused by advance action
+    std::string debuffApplied; // DoT/debuff applied by this hit ("" = none)
     // Section 21.4: intermediate multipliers, exposed for debugging/display.
     damage::DamageResult damageBreakdown;
     double critMultiplier = 1.0;   // Expected-value crit factor (Sec 21.4)
@@ -99,6 +101,7 @@ struct CharacterConfig {
     double critDmg = 0.50;         // Base 50%
     double elementalDmgPct = 0.0;  // Elemental DMG% (Sec 3)
     double allTypeDmgPct = 0.0;    // All-Type DMG% (Sec 3)
+    double dotDmgPct = 0.0;        // DoT DMG% (Sec 3, DoT ticks only)
     double resPen = 0.0;           // RES PEN, uncapped per Sec 11
     double defIgnorePct = 0.0;     // Ignore-DEF effects (Sec 4)
     double ehr = 0.0;              // Effect Hit Rate (Sec 13)
@@ -109,6 +112,15 @@ struct CharacterConfig {
     // Break milestone: Break-DMG-Increase sources (e.g. Fugue E4).
     // No gear source (Eidolon-gated); configured per character.
     double breakDmgIncrease = 0.0;   // decimals; x(1+increase) on break hits
+    // Break DoT (Phase 4.2): applied on final-bar Weakness Break when
+    // configured. All fields are user-asserted (no DB source for DoT
+    // tables); all-zero/empty = no break DoT (default, behavior unchanged).
+    // Application is EHR-gated (base chance vs enemy Effect RES + attacker
+    // EHR, Sec 13); ticks use the snapshotted source stats below.
+    std::string breakDotType;      // e.g. "Burn", "Shock", "" = none
+    double breakDotChance = 0.0;   // base chance, 0..1
+    int breakDotTurns = 0;         // tick count (enemy turns)
+    double breakDotAtkScale = 0.0; // tick base = scale x source ATK
     // Super Break: 0 = off. >0 enables documented-simplification super
     // break instances on hits against already-broken enemies.
     double superBreakModifier = 0.0;
@@ -206,6 +218,7 @@ struct EnemyConfig {
     // Debuffs currently on the enemy (Sec 6/11/12):
     double dmgTakenAll = 0.0;       // All-Type DMG Taken%
     double dmgTakenElemental = 0.0; // Elemental DMG Taken% (matching element)
+    double effectRes = 0.0;         // Enemy Effect RES (DoT/debuff gate, Sec 13)
     double vulnSum = 0.0;           // Standard VULN pool (cap 250% in formula)
     double specialVuln = 0.0;       // Special enemy vuln (2 enemies, uncapped)
     double defShredTaken = 0.0;     // DEF shred on this enemy (0..1, Sec 12)
@@ -259,7 +272,6 @@ class SimulationEngine {
 public:
     SimulationEngine();
     ~SimulationEngine();
-
     // Core Simulation
     // Multi-enemy encounter entry point (Sec 21.3/21.6).
     SimulationResult runSimulation(
@@ -326,6 +338,21 @@ private:
         bool exoSpent = false; // Second-break event already fired
         bool active;        // False until spawnAv reached / after death
         bool broken;        // True once final toughness depleted (Sec 7)
+        // Phase 4.2: active damage-over-time effects. Source stats are
+        // snapshotted at application (source may die or buffs may change).
+        struct ActiveDot {
+            std::string type;       // e.g. "Burn"
+            int remainingTicks = 0;
+            double atkScale = 0.0;  // tick base = scale x snapshotAtk
+            double snapshotAtk = 0.0;
+            int snapshotLevel = 80;
+            double snapshotElemDmg = 0.0;
+            double snapshotAllDmg = 0.0;
+            double snapshotDotDmg = 0.0;
+            double snapshotResPen = 0.0;
+            std::string snapshotElement;
+        };
+        std::vector<ActiveDot> dots;
     };
 
     // Internal helpers
@@ -370,8 +397,21 @@ private:
     // Shared break-event computation (layers, final, exo share it).
     float computeBreakEvent(const CharacterConfig& c, EnemyState& target,
                             double barMaxToughness);
+    // Phase 4.2: EHR-gated break-DoT application (no-op unless the
+    // attacker configures breakDotType + positive chance/turns).
+    void tryApplyBreakDot(const CharacterConfig& c, EnemyState& target,
+                          ActionEvent& ev);
+    // Phase 4.2: tick all active DoTs at the start of the enemy's turn.
+    // Pushes one "DotTick" event per tick, returns total dot damage.
+    // A tick-killed enemy is deactivated (no attack/recovery follows).
+    int tickEnemyDots(EnemyState& enemy, int currentGlobalAv,
+                      std::vector<ActionEvent>& timeline);
     bool allEnemiesDefeated(const std::vector<EnemyState>& enemies, int avLimit);
     bool checkZeroCycleClear(const std::vector<EnemyState>& enemies, int currentAv);
+
+    // Deterministic RNG (fixed seed): reproducible EHR rolls and therefore
+    // reproducible sims. Documented, not hidden.
+    std::mt19937 m_rng;
 };
 
 } // namespace hsr
