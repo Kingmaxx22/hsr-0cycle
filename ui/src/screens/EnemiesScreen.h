@@ -48,6 +48,9 @@ public:
     void draw() override;
 
     const std::array<std::vector<SlotEntry>, kSlotCount>& getSlots() const { return slots; }
+    // Per-slot wave arming: a sequential slot fights one entry at a time,
+    // spawning the next when the current one dies.
+    const std::array<bool, kSlotCount>& getSequential() const { return slotSequential; }
     bool consumeBackRequest();
 
 private:
@@ -64,6 +67,7 @@ private:
     Rectangle slotEntryResBounds(int entryRow) const;
     Rectangle slotEntryExoBounds(int entryRow) const;
     Rectangle slotClearBounds() const;
+    Rectangle slotWaveBounds() const;
 
     void rebuildFiltered();
     void toggleSlotEntry(const EnemyInfo& enemy);
@@ -78,6 +82,8 @@ private:
 
     std::array<std::vector<SlotEntry>, kSlotCount> slots;
     int activeSlot = 0;
+    // Wave arming per slot (false = all entries fight together).
+    std::array<bool, kSlotCount> slotSequential = {false, false, false, false, false};
 
     std::vector<const EnemyInfo*> filtered;
     int hoveredRow = -1;

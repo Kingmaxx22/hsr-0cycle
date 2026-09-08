@@ -149,11 +149,13 @@ static hsr::CharacterConfig BuildSimCharacter(
 // here — the enemy DB stays the single source of truth for stats.
 static hsr::EncounterConfig BuildEncounter(
     const std::array<std::vector<SlotEntry>, EnemiesScreen::kSlotCount>& slots,
+    const std::array<bool, EnemiesScreen::kSlotCount>& sequential,
     const EnemyDatabase& enemies)
 {
     hsr::EncounterConfig encounter;
     for (size_t s = 0; s < slots.size(); ++s)
     {
+        encounter.sequential[s] = sequential[s];
         for (const auto& entry : slots[s])
         {
             const EnemyInfo* info = enemies.get(entry.id);
@@ -194,7 +196,7 @@ static hsr::EncounterConfig BuildEncounter(
 void App::goToSimulationScreen(int navIndex)
 {
     // Pass the configured 5-slot encounter (empty slots are valid).
-    simulationScreen->setEncounter(BuildEncounter(enemiesScreen->getSlots(), enemies));
+    simulationScreen->setEncounter(BuildEncounter(enemiesScreen->getSlots(), enemiesScreen->getSequential(), enemies));
     // Section 21.7: push the configured team straight into the engine.
     bool hasTeam = false;
     for (const auto& id : teamBuilder->getTeam()) {

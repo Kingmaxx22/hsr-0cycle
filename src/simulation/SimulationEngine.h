@@ -237,9 +237,13 @@ struct EnemyConfig {
 
 // Encounter: exactly five enemy slots (Sec 19/22.9); each slot holds
 // zero or more enemy instances. Enemies with spawnAv > 0 enter combat
-// dynamically without creating new slots.
+// dynamically without creating new slots. A sequential slot is a wave:
+// only its first living entry is active; each later entry activates when
+// every earlier entry in that slot is dead (off by default, so stacked
+// duplicates still fight together unless the slot is armed as a wave).
 struct EncounterConfig {
     std::array<std::vector<EnemyConfig>, 5> slots;
+    std::array<bool, 5> sequential = {false, false, false, false, false};
 
     // Flattened view (slot order, then insertion order) for the engine loop.
     std::vector<EnemyConfig> flatten() const {
@@ -344,6 +348,8 @@ private:
         bool exoSpent = false; // Second-break event already fired
         bool active;        // False until spawnAv reached / after death
         bool broken;        // True once final toughness depleted (Sec 7)
+        int slotOrder = 0;  // Insertion index within its slot (wave order)
+        bool sequentialSlot = false; // Wave slot: gated behind earlier deaths
         // Phase 4.2: active damage-over-time effects. Source stats are
         // snapshotted at application (source may die or buffs may change).
         struct ActiveDot {
@@ -414,6 +420,9 @@ private:
                       std::vector<ActionEvent>& timeline);
     bool allEnemiesDefeated(const std::vector<EnemyState>& enemies, int avLimit);
     bool checkZeroCycleClear(const std::vector<EnemyState>& enemies, int currentAv);
+    // Wave readiness: every earlier entry in the same slot is dead.
+    static bool waveReady(const std::vector<EnemyState>& enemies,
+                          const EnemyState& e);
 
     // Deterministic RNG (fixed seed): reproducible EHR rolls and therefore
     // reproducible sims. Documented, not hidden.

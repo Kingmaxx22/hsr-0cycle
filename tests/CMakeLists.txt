@@ -97,3 +97,10 @@ hsr_add_test(test_e2e
     ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
     ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
 )
+
+# Sequential wave slots: later entries activate on earlier deaths.
+hsr_add_test(test_waves
+    test_waves.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)

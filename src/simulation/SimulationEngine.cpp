@@ -668,16 +668,42 @@ bool SimulationEngine::allEnemiesDefeated(const std::vector<EnemyState>& enemies
         // A pending spawn inside the AV limit means combat is not over.
         if (!e.active && e.currentHp > 0 && e.config.spawnAv > 0 && e.config.spawnAv <= avLimit)
             return false;
+        // A wave entry queued behind living slot-mates is pending combat.
+        // So is a dormant entry whose predecessors just died: it activates
+        // at the next loop top (this check also runs mid-loop right after
+        // a kill, before that activation). Only an out-of-limit clock
+        // means it never enters.
+        if (!e.active && e.currentHp > 0 && e.sequentialSlot && e.slotOrder > 0) {
+            bool earlierAlive = false;
+            for (const auto& o : enemies) {
+                if (o.config.slotIndex == e.config.slotIndex &&
+                    o.slotOrder < e.slotOrder && o.currentHp > 0)
+                    earlierAlive = true;
+            }
+            if (earlierAlive)
+                return false;
+            if (e.config.spawnAv <= 0 || e.config.spawnAv <= avLimit)
+                return false;
+        }
     }
     return true;
 }
 
-bool SimulationEngine::checkZeroCycleClear(const std::vector<EnemyState>& enemies, int currentAv) {
-    // Single-wave convenience predicate: everything currently known is
+bool SimulationEngine::checkZeroCycleClear(const std::vector<EnemyState>& enemies, int currentAv) {    // Single-wave convenience predicate: everything currently known is
     // resolved and the kill happened at or under 150.00 AV. NOTE: the main
     // loop does NOT use this — it checks allEnemiesDefeated(enemies,
     // avLimit) so pending in-limit spawns correctly block a clear.
     return allEnemiesDefeated(enemies, currentAv) && currentAv <= 15000;
+}
+
+bool SimulationEngine::waveReady(const std::vector<EnemyState>& enemies,
+                                 const EnemyState& e) {
+    for (const auto& o : enemies) {
+        if (o.config.slotIndex == e.config.slotIndex &&
+            o.slotOrder < e.slotOrder && o.currentHp > 0)
+            return false;
+    }
+    return true;
 }
 
 std::vector<SimulationEngine::SpeedBreakpoint> SimulationEngine::calculateBreakpoints(
@@ -743,6 +769,7 @@ SimulationResult SimulationEngine::runSimulation(
     };
 
     std::vector<EnemyState> enemyStates;
+    int orderBySlot[5] = {0, 0, 0, 0, 0};
     for (const auto& e : encounter.flatten()) {
         EnemyState state;
         state.config = e;
@@ -754,7 +781,13 @@ SimulationResult SimulationEngine::runSimulation(
         state.barIndex = 0;
         state.currentToughness = state.bars[0];
         state.currentExo = std::max(0, e.exoToughness);
-        state.active = (e.spawnAv <= 0);
+        int s = std::clamp(e.slotIndex, 0, 4);
+        state.slotOrder = orderBySlot[s]++;
+        state.sequentialSlot = encounter.sequential[static_cast<size_t>(s)];
+        // Wave entries after the first start dormant until earlier
+        // slot-mates die (concurrent slots keep the old behavior).
+        bool waveEntry = state.sequentialSlot && state.slotOrder > 0;
+        state.active = (e.spawnAv <= 0) && !waveEntry;
         state.broken = false;
         // First turn threshold from enemy SPD (present) or spawn clock.
         state.currentAv = (e.spawnAv <= 0) ? enemyAvCost(e.spd)
@@ -773,18 +806,34 @@ SimulationResult SimulationEngine::runSimulation(
 
     // Main simulation loop - process actions in AV order.
     while (currentGlobalAv <= avLimit) {
-        // Activate scheduled spawns (Sec 21.3: dynamic mid-combat entry).
+        // Activate scheduled spawns (Sec 21.3: dynamic mid-combat entry)
+        // and wave-slot entries whose earlier slot-mates are all dead.
         for (auto& e : enemyStates) {
-            if (!e.active && e.currentHp > 0 && e.config.spawnAv > 0 &&
-                e.config.spawnAv <= currentGlobalAv) {
-                e.active = true;
-                ActionEvent spawnEvent;
-                spawnEvent.actionType = "Spawn";
-                spawnEvent.characterName = e.config.name;
-                spawnEvent.targetEnemyId = e.config.id;
-                spawnEvent.currentAv = currentGlobalAv;
-                result.timeline.push_back(spawnEvent);
+            if (e.active || e.currentHp <= 0)
+                continue;
+            bool waveEntry = e.sequentialSlot && e.slotOrder > 0;
+            if (!waveEntry) {
+                if (!(e.config.spawnAv > 0 &&
+                      e.config.spawnAv <= currentGlobalAv))
+                    continue;
+            } else {
+                if (e.config.spawnAv > 0 &&
+                    e.config.spawnAv > currentGlobalAv)
+                    continue;
+                if (!waveReady(enemyStates, e))
+                    continue;
+                // Enter on the current clock, not on a stale threshold.
+                e.currentAv = currentGlobalAv + enemyAvCost(e.config.spd);
             }
+            e.active = true;
+            ActionEvent spawnEvent;
+            spawnEvent.actionType = "Spawn";
+            spawnEvent.characterName = e.config.name;
+            spawnEvent.targetEnemyId = e.config.id;
+            spawnEvent.currentAv = currentGlobalAv;
+            spawnEvent.damageDealt = 0;
+            spawnEvent.spChange = 0;
+            result.timeline.push_back(spawnEvent);
         }
 
         if (allEnemiesDefeated(enemyStates, avLimit))

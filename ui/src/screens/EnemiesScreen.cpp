@@ -206,6 +206,12 @@ Rectangle EnemiesScreen::slotClearBounds() const
     return Rectangle{1142.0f, 828.0f, 120.0f, 26.0f};
 }
 
+Rectangle EnemiesScreen::slotWaveBounds() const
+{
+    // Wave arming for the active slot, right of the slot header.
+    return Rectangle{1290.0f, 636.0f, 120.0f, 26.0f};
+}
+
 void EnemiesScreen::drawSlotContents()
 {
     const auto& slot = slots[static_cast<size_t>(activeSlot)];
@@ -213,6 +219,20 @@ void EnemiesScreen::drawSlotContents()
     std::string header = "SLOT " + std::to_string(activeSlot + 1) +
         " (" + std::to_string(slot.size()) + ")";
     DrawText(header.c_str(), 1150, 642, 14, RAYWHITE);
+
+    // WAVE toggle: sequential slots fight one entry at a time.
+    {
+        Rectangle waveR = slotWaveBounds();
+        bool wave = slotSequential[static_cast<size_t>(activeSlot)];
+        DrawRectangleRounded(waveR, 0.14f, 6,
+            wave ? kAccentBg : kPanelBg);
+        DrawRectangleRoundedLines(waveR, 0.14f, 6,
+            wave ? kAccentBorder : kPanelBorder);
+        std::string waveLabel = wave ? "WAVE: ON" : "WAVE: OFF";
+        DrawText(waveLabel.c_str(), static_cast<int>(waveR.x + 14),
+                 static_cast<int>(waveR.y + 6), 13,
+                 wave ? RAYWHITE : kDimText);
+    }
 
     size_t shown = std::min(slot.size(), static_cast<size_t>(6));
     for (size_t e = 0; e < shown; ++e)
@@ -482,6 +502,12 @@ void EnemiesScreen::update(float dt)
         if (!slot.empty() && CheckCollisionPointRec(mouse, slotClearBounds()))
         {
             slots[static_cast<size_t>(activeSlot)].clear();
+            return;
+        }
+        if (CheckCollisionPointRec(mouse, slotWaveBounds()))
+        {
+            bool& wave = slotSequential[static_cast<size_t>(activeSlot)];
+            wave = !wave;
             return;
         }
     }
@@ -843,6 +869,10 @@ void EnemiesScreen::draw()
         DrawText(
             "ADD stacks duplicates.",
             1150, 222, 12, kDimText);
+
+        DrawText(
+            "WAVE fights one at a time.",
+            1150, 240, 12, kDimText);
 
         drawSlotContents();
         return;
