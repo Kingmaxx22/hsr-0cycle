@@ -325,9 +325,16 @@ void SimulationScreen::drawTimeline() {
 
             // Determine color based on action type
             Color actionColor = BLUE;
-            if (action.actionType == "Skill") actionColor = ORANGE;
+            if (action.actionType == "Basic") actionColor = BLUE;
+            else if (action.actionType == "Skill") actionColor = ORANGE;
             else if (action.actionType == "Ult") actionColor = PURPLE;
             else if (action.actionType == "FUA") actionColor = PINK;
+            else if (action.actionType == "Memosprite") actionColor = Color{180, 100, 200, 255};
+            else if (action.actionType == "EnemyAtk") actionColor = RED;
+            else if (action.actionType == "DoT") actionColor = DARKGREEN;
+            else if (action.actionType == "Break") actionColor = Color{255, 165, 0, 255};
+            else if (action.actionType == "Heal") actionColor = LIME;
+            else if (action.actionType == "Shield") actionColor = SKYBLUE;
 
             // Draw action box
             Rectangle actionRect = {x, y, actionWidth, 25};
@@ -398,6 +405,22 @@ void SimulationScreen::drawCharacterSlots() {
             // Enter completed character workflow: show indicator
             DrawText("Entered Stats", slot.x + 10, slot.y + 45, 11, YELLOW);
             DrawText("(manual)", slot.x + 10, slot.y + 58, 11, GRAY);
+        }
+
+        // Passive notes (traces, LC passives, resolver notes)
+        if (!characters[i].passiveNotes.empty()) {
+            int noteY = static_cast<int>(slot.y + slot.height - 28);
+            int shown = 0;
+            for (const auto& note : characters[i].passiveNotes) {
+                if (shown >= 2) {
+                    DrawText(("+" + std::to_string(characters[i].passiveNotes.size() - 2) + " more").c_str(),
+                             slot.x + 10, noteY, 9, GRAY);
+                    break;
+                }
+                DrawText(note.c_str(), slot.x + 10, noteY, 9, GRAY);
+                noteY += 11;
+                ++shown;
+            }
         }
 
         // Remove button (small X)
@@ -484,11 +507,19 @@ void SimulationScreen::drawResults() {
 
     // Background panel
     DrawRectangleRec(rect, Fade(BLACK, 0.7f));
-    DrawRectangleLinesEx(rect, 2, lastResult.isZeroCycleClear ? GOLD : GRAY);
+    Color borderColor = GRAY;
+    if (lastResult.isZeroCycleClear) borderColor = GOLD;
+    else if (lastResult.partyWiped) borderColor = RED;
+    else if (!lastResult.errorMessage.empty()) borderColor = ORANGE;
+    DrawRectangleLinesEx(rect, 2, borderColor);
 
     // Title
-    const char* title = lastResult.isZeroCycleClear ? "✓ 0-CYCLE CLEAR!" : "✗ Not a 0-Cycle Clear";
-    Color titleColor = lastResult.isZeroCycleClear ? GOLD : RED;
+    const char* title;
+    Color titleColor;
+    if (lastResult.isZeroCycleClear) { title = "0-CYCLE CLEAR!"; titleColor = GOLD; }
+    else if (lastResult.partyWiped) { title = "Party Wiped"; titleColor = RED; }
+    else if (!lastResult.errorMessage.empty()) { title = "Simulation Error"; titleColor = ORANGE; }
+    else { title = "Not a 0-Cycle Clear"; titleColor = RED; }
     int titleWidth = MeasureText(title, 24);
     DrawText(title, rect.x + rect.width/2 - titleWidth/2, rect.y + 10, 24, titleColor);
 
@@ -508,13 +539,27 @@ void SimulationScreen::drawResults() {
     std::string cyclesStr = "Cycles: " + std::to_string(lastResult.totalCycles);
     DrawText(cyclesStr.c_str(), rect.x + 20, yPos + lineHeight * 3, 18, WHITE);
 
+    // Error / wipe reason
+    int extraY = yPos + lineHeight * 4;
+    if (!lastResult.errorMessage.empty()) {
+        DrawText(("Error: " + lastResult.errorMessage).c_str(),
+                 rect.x + 20, extraY, 14, ORANGE);
+        extraY += 20;
+    }
+    if (lastResult.partyWiped) {
+        DrawText("Reason: all allies fell to enemy offense",
+                 rect.x + 20, extraY, 14, RED);
+        extraY += 20;
+    }
+
     // Timeline summary
     std::string timelineStr = "Timeline: " + std::to_string(lastResult.timeline.size()) + " actions";
     DrawText(timelineStr.c_str(), rect.x + 300, yPos, 18, LIGHTGRAY);
 
-    if (lastResult.success) {
-        std::string avUsed = "AV Used: " + std::to_string(lastResult.timeline.back().currentAv / 100) + "." +
-                            std::to_string(lastResult.timeline.back().currentAv % 100);
+    if (lastResult.success && !lastResult.timeline.empty()) {
+        int finalAv = lastResult.timeline.back().currentAv;
+        std::string avUsed = "AV Used: " + std::to_string(finalAv / 100) + "." +
+                            std::to_string(finalAv % 100);
         DrawText(avUsed.c_str(), rect.x + 300, yPos + lineHeight, 18, LIGHTGRAY);
     }
 }
@@ -522,31 +567,120 @@ void SimulationScreen::drawResults() {
 void SimulationScreen::drawActionTooltip(const hsr::ActionEvent& action) {
     Vector2 mousePos = GetMousePosition();
 
-    // Tooltip dimensions
-    int width = 200;
-    int height = 120;
+    // Tooltip dimensions: dynamic height based on splash hits.
+    int width = 240;
+    int lineHeight = 18;
+    int baseLines = 7; // name, action, AV cost, AV time, damage, SP, extra-turn
+    int extraLines = static_cast<int>(action.splashHits.size());
+    int breakLines = action.breakDamage > 0.0f ? 2 : 0;
+    int debuffLines = !action.debuffApplied.empty() ? 1 : 0;
+    int shieldLines = action.shieldAmount > 0.0f ? 1 : 0;
+    int healLines = action.healAmount > 0.0f ? 1 : 0;
+    int height = (baseLines + extraLines + breakLines + debuffLines +
+                  shieldLines + healLines) * lineHeight + 20;
+
     float x = mousePos.x + 15;
     float y = mousePos.y + 15;
-
-    // Keep tooltip on screen
     if (x + width > GetScreenWidth()) x = mousePos.x - width - 15;
     if (y + height > GetScreenHeight()) y = mousePos.y - height - 15;
 
     // Background
-    DrawRectangle(x, y, width, height, Fade(BLACK, 0.9f));
+    DrawRectangle(x, y, width, height, Fade(BLACK, 0.92f));
     DrawRectangleLines(x, y, width, height, WHITE);
 
-    // Content
-    int yPos = y + 10;
-    int lineHeight = 20;
+    int yPos = y + 8;
 
-    DrawText(action.characterName.c_str(), x + 10, yPos, 16, YELLOW);
-    DrawText(("Action: " + action.actionType).c_str(), x + 10, yPos + lineHeight, 14, WHITE);
+    // Character + action type
+    DrawText(action.characterName.c_str(), x + 10, yPos, 14, YELLOW);
+    yPos += lineHeight;
+
+    Color actCol = WHITE;
+    if (action.actionType == "Basic") actCol = BLUE;
+    else if (action.actionType == "Skill") actCol = ORANGE;
+    else if (action.actionType == "Ult") actCol = PURPLE;
+    else if (action.actionType == "FUA") actCol = PINK;
+    else if (action.actionType == "EnemyAtk") actCol = RED;
+    else if (action.actionType == "DoT") actCol = DARKGREEN;
+    else if (action.actionType == "Break") actCol = Color{255, 165, 0, 255};
+    else if (action.actionType == "Heal") actCol = LIME;
+    else if (action.actionType == "Shield") actCol = SKYBLUE;
+    DrawText(("Action: " + action.actionType).c_str(), x + 10, yPos, 13, actCol);
+    yPos += lineHeight;
+
+    // Target
+    if (!action.targetEnemyId.empty()) {
+        DrawText(("Target: " + action.targetEnemyId).c_str(), x + 10, yPos, 12, LIGHTGRAY);
+        yPos += lineHeight;
+    }
+    if (!action.targetAllyId.empty()) {
+        DrawText(("Ally: " + action.targetAllyId).c_str(), x + 10, yPos, 12, LIGHTGRAY);
+        yPos += lineHeight;
+    }
+
+    // AV cost + time
     DrawText(("AV Cost: " + std::to_string(action.avCost / 100) + "." +
-             std::to_string(action.avCost % 100)).c_str(), x + 10, yPos + lineHeight * 2, 14, WHITE);
+             std::to_string(action.avCost % 100)).c_str(), x + 10, yPos, 12, WHITE);
+    yPos += lineHeight;
     DrawText(("AV Time: " + std::to_string(action.currentAv / 100) + "." +
-             std::to_string(action.currentAv % 100)).c_str(), x + 10, yPos + lineHeight * 3, 14, WHITE);
-    DrawText(("Damage: " + std::to_string(action.damageDealt)).c_str(), x + 10, yPos + lineHeight * 4, 14, GREEN);
-    DrawText(("SP Change: " + std::to_string(action.spChange)).c_str(), x + 10, yPos + lineHeight * 5, 14,
+             std::to_string(action.currentAv % 100)).c_str(), x + 10, yPos, 12, WHITE);
+    yPos += lineHeight;
+
+    // Damage on primary target
+    DrawText(("Damage: " + std::to_string(action.damageDealt)).c_str(),
+             x + 10, yPos, 13, GREEN);
+    yPos += lineHeight;
+
+    // Splash hits
+    for (const auto& splash : action.splashHits) {
+        std::string splashLine = "  -> " + splash.enemyId + ": " +
+            std::to_string(splash.damageDealt);
+        DrawText(splashLine.c_str(), x + 10, yPos, 11, LIGHTGRAY);
+        yPos += lineHeight;
+    }
+
+    // Break damage
+    if (action.breakDamage > 0.0f) {
+        DrawText(("Break: " + std::to_string(static_cast<int>(action.breakDamage))).c_str(),
+                 x + 10, yPos, 12, Color{255, 165, 0, 255});
+        yPos += lineHeight;
+    }
+    if (action.superBreakDamage > 0.0f) {
+        DrawText(("SuperBreak: " + std::to_string(static_cast<int>(action.superBreakDamage))).c_str(),
+                 x + 10, yPos, 12, Color{255, 200, 0, 255});
+        yPos += lineHeight;
+    }
+
+    // SP change
+    DrawText(("SP: " + std::to_string(action.spChange)).c_str(), x + 10, yPos, 12,
              action.spChange > 0 ? GREEN : (action.spChange < 0 ? RED : WHITE));
+    yPos += lineHeight;
+
+    // Debuff applied
+    if (!action.debuffApplied.empty()) {
+        DrawText(("Debuff: " + action.debuffApplied).c_str(), x + 10, yPos, 12, PINK);
+        yPos += lineHeight;
+    }
+
+    // Heal / Shield
+    if (action.healAmount > 0.0f) {
+        DrawText(("Heal: " + std::to_string(static_cast<int>(action.healAmount))).c_str(),
+                 x + 10, yPos, 12, LIME);
+        yPos += lineHeight;
+    }
+    if (action.shieldAmount > 0.0f) {
+        DrawText(("Shield: " + std::to_string(static_cast<int>(action.shieldAmount))).c_str(),
+                 x + 10, yPos, 12, SKYBLUE);
+        yPos += lineHeight;
+    }
+    if (action.shieldAbsorbed > 0.0f) {
+        DrawText(("Shield Absorbed: " + std::to_string(static_cast<int>(action.shieldAbsorbed))).c_str(),
+                 x + 10, yPos, 12, SKYBLUE);
+        yPos += lineHeight;
+    }
+
+    // Extra turn indicator
+    if (action.isExtraTurn) {
+        DrawText("Extra Turn", x + 10, yPos, 12, YELLOW);
+        yPos += lineHeight;
+    }
 }
