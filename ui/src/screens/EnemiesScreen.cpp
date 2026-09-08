@@ -157,9 +157,10 @@ Rectangle EnemiesScreen::rowAddBounds(int row)
 
 Rectangle EnemiesScreen::slotTabBounds(int slot)
 {
+    // Below the search box (y 104-142): no vertical overlap with it.
     return Rectangle{
         310.0f + slot * 140.0f,
-        132.0f,
+        150.0f,
         132.0f,
         38.0f
     };
@@ -692,6 +693,7 @@ void EnemiesScreen::draw()
             static_cast<int>(tab.y + 11),
             14,
             armed ? RAYWHITE : kDimText);
+    }
     }
 
 
