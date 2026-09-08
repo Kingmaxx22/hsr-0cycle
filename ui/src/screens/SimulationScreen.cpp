@@ -388,13 +388,15 @@ void SimulationScreen::drawTimeline() {
                 DrawRectangleLinesEx(actionRect, 3, YELLOW);
             }
         }
-        EndScissorMode();
     } else {
         // Show placeholder text
         const char* placeholder = "No simulation data - Press R to run";
         int width = MeasureText(placeholder, 20);
         DrawText(placeholder, rect.x + rect.width/2 - width/2, rect.y + rect.height/2 - 10, 20, GRAY);
     }
+    // Always paired with the BeginScissorMode above: leaving the scissor
+    // enabled would clip every later draw (and later screens) that frame.
+    EndScissorMode();
 }
 
 void SimulationScreen::drawCharacterSlots() {

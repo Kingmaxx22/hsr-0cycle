@@ -644,7 +644,7 @@ void EnemiesScreen::draw()
         TextFormat(
             "%d matches",
             static_cast<int>(filtered.size())),
-        1000, 154, 13, kDimText);
+        1012, 154, 13, kDimText);
 
     // Encounter slot tabs: exactly five slots, click to arm one for edits.
     for (int s = 0; s < kSlotCount; ++s)
