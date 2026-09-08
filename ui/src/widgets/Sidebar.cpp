@@ -53,7 +53,7 @@ int Sidebar::updateAndDraw(int activeNav) const
     }
 
     DrawText("ENGINE", 28, GetScreenHeight() - 82, 13, GRAY);
-    DrawText("Rule engine: connected later", 28, GetScreenHeight() - 58, 13,
+    DrawText("C++ sim: connected", 28, GetScreenHeight() - 58, 13,
              Color{115, 120, 132, 255});
 
     return clicked;

@@ -138,19 +138,30 @@ Rectangle EnemiesScreen::rowBounds(int row)
 {
     return Rectangle{
         310.0f,
-        200.0f + row * 66.0f,
+        236.0f + row * 66.0f,
         800.0f,
         56.0f
+    };
+}
+
+Rectangle EnemiesScreen::rowAddBounds(int row)
+{
+    Rectangle r = rowBounds(row);
+    return Rectangle{
+        r.x + r.width - 78.0f,
+        r.y + 10.0f,
+        66.0f,
+        36.0f
     };
 }
 
 Rectangle EnemiesScreen::slotTabBounds(int slot)
 {
     return Rectangle{
-        310.0f + slot * 130.0f,
-        140.0f,
-        122.0f,
-        26.0f
+        310.0f + slot * 140.0f,
+        132.0f,
+        132.0f,
+        38.0f
     };
 }
 
@@ -324,7 +335,7 @@ void EnemiesScreen::rebuildFiltered()
         });
 
     const int maxScroll =
-        std::max(0, static_cast<int>(filtered.size()) - 10);
+        std::max(0, static_cast<int>(filtered.size()) - kVisibleRows);
 
     scrollOffset =
         std::clamp(scrollOffset, 0, maxScroll);
@@ -332,8 +343,9 @@ void EnemiesScreen::rebuildFiltered()
 
 void EnemiesScreen::toggleSlotEntry(const EnemyInfo& enemy)
 {
-    // Click toggles the id in the ACTIVE slot (dedupe within a slot;
-    // the same id may still appear in other slots).
+    // Click on a row body toggles the id in the ACTIVE slot: removes one
+    // instance if present, otherwise adds one. Duplicates stacked via the
+    // ADD button are removed one at a time this way.
     auto& slot = slots[static_cast<size_t>(activeSlot)];
     for (auto it = slot.begin(); it != slot.end(); ++it)
     {
@@ -344,6 +356,14 @@ void EnemiesScreen::toggleSlotEntry(const EnemyInfo& enemy)
         }
     }
     slot.push_back(SlotEntry{enemy.id, 0});
+}
+
+void EnemiesScreen::addSlotEntry(const EnemyInfo& enemy)
+{
+    // ADD button: always appends another instance, so the same enemy can
+    // be stacked multiple times in one slot. The encounter builder turns
+    // each entry into its own engine instance.
+    slots[static_cast<size_t>(activeSlot)].push_back(SlotEntry{enemy.id, 0});
 }
 
 bool EnemiesScreen::consumeBackRequest()
@@ -471,13 +491,13 @@ void EnemiesScreen::update(float dt)
     if (wheel != 0.0f)
     {
         const Rectangle listArea{
-            310.0f, 198.0f, 800.0f, 660.0f
+            310.0f, 234.0f, 800.0f, 600.0f
         };
 
         if (CheckCollisionPointRec(mouse, listArea))
         {
             const int maxScroll =
-                std::max(0, static_cast<int>(filtered.size()) - 10);
+                std::max(0, static_cast<int>(filtered.size()) - kVisibleRows);
 
             scrollOffset =
                 std::clamp(
@@ -490,7 +510,7 @@ void EnemiesScreen::update(float dt)
 
     hoveredRow = -1;
 
-    for (int row = 0; row < 10; ++row)
+    for (int row = 0; row < kVisibleRows; ++row)
     {
         const int index = scrollOffset + row;
 
@@ -504,8 +524,15 @@ void EnemiesScreen::update(float dt)
             hoveredRow = index;
 
             if (pressed)
-                toggleSlotEntry(
-                    *filtered[static_cast<size_t>(index)]);
+            {
+                // ADD button stacks a duplicate; row body toggles.
+                if (CheckCollisionPointRec(mouse, rowAddBounds(row)))
+                    addSlotEntry(
+                        *filtered[static_cast<size_t>(index)]);
+                else
+                    toggleSlotEntry(
+                        *filtered[static_cast<size_t>(index)]);
+            }
 
             break;
         }
@@ -635,15 +662,15 @@ void EnemiesScreen::draw()
             " (" + std::to_string(slots[static_cast<size_t>(s)].size()) + ")";
         DrawText(
             label.c_str(),
-            static_cast<int>(tab.x + 10),
-            static_cast<int>(tab.y + 7),
-            12,
+            static_cast<int>(tab.x + 14),
+            static_cast<int>(tab.y + 11),
+            14,
             armed ? RAYWHITE : kDimText);
     }
 
 
 
-    for (int row = 0; row < 10; ++row)
+    for (int row = 0; row < kVisibleRows; ++row)
     {
         const int index = scrollOffset + row;
 
@@ -655,16 +682,15 @@ void EnemiesScreen::draw()
 
         const Rectangle r = rowBounds(row);
 
-        // Selected = present in the ACTIVE slot (toggle model).
-        bool selected = false;
+        // Selected = present in the ACTIVE slot (toggle model). Duplicates
+        // stacked via ADD still highlight; the badge shows the count.
+        int inSlot = 0;
         for (const auto& entry : slots[static_cast<size_t>(activeSlot)])
         {
             if (entry.id == enemy.id)
-            {
-                selected = true;
-                break;
-            }
+                ++inSlot;
         }
+        const bool selected = inSlot > 0;
 
         const bool hovered =
             index == hoveredRow;
@@ -743,6 +769,36 @@ void EnemiesScreen::draw()
                 11,
                 Color{210, 180, 140, 255});
         }
+
+        // Duplicate badge: how many copies of this enemy sit in the
+        // armed slot (only when stacked more than once).
+        if (inSlot > 1)
+        {
+            DrawText(
+                TextFormat("x%d", inSlot),
+                static_cast<int>(r.x + 620.0f),
+                static_cast<int>(r.y + 30.0f),
+                12,
+                Color{140, 200, 140, 255});
+        }
+
+        // ADD button: stacks another copy of this enemy in the armed slot.
+        const Rectangle addR = rowAddBounds(row);
+        const bool addHover = CheckCollisionPointRec(
+            GetMousePosition(), addR);
+        DrawRectangleRounded(
+            addR, 0.2f, 6,
+            addHover ? kAccentBg : kPanelBg);
+        DrawRectangleRoundedLines(
+            addR, 0.2f, 6,
+            addHover ? kAccentBorder : kPanelBorder);
+        const char* addLabel = "ADD";
+        DrawText(
+            addLabel,
+            static_cast<int>(addR.x + 19.0f),
+            static_cast<int>(addR.y + 10.0f),
+            14,
+            addHover ? RAYWHITE : kDimText);
     }
 
     const Rectangle detail{
@@ -781,8 +837,12 @@ void EnemiesScreen::draw()
             1150, 178, 13, kDimText);
 
         DrawText(
-            "Click again to remove.",
+            "Click again to remove,",
             1150, 204, 12, kDimText);
+
+        DrawText(
+            "ADD stacks duplicates.",
+            1150, 222, 12, kDimText);
 
         drawSlotContents();
         return;
@@ -887,6 +947,6 @@ void EnemiesScreen::draw()
     drawSlotContents();
 
     DrawText(
-        "Mouse wheel: scroll list | Click a row to toggle it in the armed slot",
+        "Mouse wheel: scroll list | Click a row to toggle, ADD stacks duplicates",
         310, 868, 12, kDimText);
 }

@@ -35,8 +35,11 @@ public:
     };
 
     // Exactly five encounter slots (AGENTS.md Sec 19/35); each holds
-    // zero or more entries. Empty slots are valid.
+    // zero or more entries. Empty slots are valid. The same enemy id
+    // may appear multiple times in one slot (stacked duplicates).
     static constexpr int kSlotCount = 5;
+    // Visible enemy rows in the scroll list.
+    static constexpr int kVisibleRows = 9;
 
     EnemiesScreen(AssetManager& assets, EnemyDatabase& enemies);
 
@@ -52,6 +55,7 @@ private:
     Rectangle searchBounds();
     Rectangle filterBounds(Filter selectedFilter);
     Rectangle rowBounds(int row);
+    Rectangle rowAddBounds(int row);
     Rectangle slotTabBounds(int slot);
     Rectangle slotEntryBounds(int entryRow) const;
     Rectangle slotEntryRemoveBounds(int entryRow) const;
@@ -63,6 +67,7 @@ private:
 
     void rebuildFiltered();
     void toggleSlotEntry(const EnemyInfo& enemy);
+    void addSlotEntry(const EnemyInfo& enemy);
     void drawSlotContents();
 
     AssetManager& assets;
