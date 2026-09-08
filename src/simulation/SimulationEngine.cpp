@@ -233,6 +233,30 @@ bool SimulationEngine::applyEnemyAction(std::vector<CharState>& allies,
     allies[targetIdx].shield -= absorbed;
     event.shieldAbsorbed = static_cast<float>(absorbed);
     allies[targetIdx].currentHp = std::max(0, allies[targetIdx].currentHp - (raw - absorbed));
+
+    // Phase 4.1: enemy splash. Blast = team-order-adjacent living allies,
+    // AoE = all other living allies, each at full damage through their own
+    // shield pool. Recorded in splashHits (enemyId holds the ally id).
+    const std::string& ott = enemy.config.offenseTargetType;
+    if (ott == "Blast" || ott == "AoE") {
+        for (size_t i = 0; i < allies.size(); ++i) {
+            if (i == targetIdx || allies[i].currentHp <= 0)
+                continue;
+            if (ott == "Blast") {
+                size_t lo = (targetIdx > 0) ? targetIdx - 1 : 0;
+                if (i < lo || i > targetIdx + 1)
+                    continue;
+            }
+            int splashRaw = calculateEnemyHitDamage(enemy.config, allies[i].config);
+            int splashAbsorbed = std::min(allies[i].shield, splashRaw);
+            allies[i].shield -= splashAbsorbed;
+            allies[i].currentHp = std::max(0, allies[i].currentHp - (splashRaw - splashAbsorbed));
+            SplashHit hit;
+            hit.enemyId = allies[i].config.id;
+            hit.damageDealt = splashRaw;
+            event.splashHits.push_back(hit);
+        }
+    }
     timeline.push_back(event);
 
     for (const auto& cs : allies) {

@@ -167,6 +167,9 @@ static hsr::EncounterConfig BuildEncounter(
             config.weaknesses = info->weaknesses;
             config.slotIndex = static_cast<int>(s);
             config.spawnAv = entry.spawnAv;
+            // Phase 4.1: offense targeting from the enemy DB (Single
+            // fallback when the CSV has no targeting text for this foe).
+            config.offenseTargetType = info->offenseTargetType;
             // Per-entry RES override wins over the Q2 auto-rule; negative
             // keeps auto (weakness-first, then map, else 20%).
             if (entry.resOverride >= 0.0)

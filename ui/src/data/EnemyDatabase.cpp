@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <utility>
 
@@ -15,6 +16,125 @@ using json = nlohmann::json;
 
 namespace
 {
+    std::string trim(std::string value); // defined below
+
+    // Phase 4.1 overlay: offense targeting from monsters_data.csv skill
+    // text. Quote-aware minimal CSV split (only id + skills columns used).
+    std::vector<std::string> splitCsvRow(const std::string& line)
+    {
+        std::vector<std::string> cols;
+        std::string cur;
+        bool inQuotes = false;
+        for (size_t i = 0; i < line.size(); ++i)
+        {
+            char c = line[i];
+            if (inQuotes)
+            {
+                if (c == '"')
+                {
+                    if (i + 1 < line.size() && line[i + 1] == '"')
+                    {
+                        cur.push_back('"');
+                        ++i;
+                    }
+                    else
+                        inQuotes = false;
+                }
+                else
+                    cur.push_back(c);
+            }
+            else if (c == '"')
+                inQuotes = true;
+            else if (c == ',')
+            {
+                cols.push_back(cur);
+                cur.clear();
+            }
+            else
+                cur.push_back(c);
+        }
+        cols.push_back(cur);
+        return cols;
+    }
+
+    std::string lowerCopy(std::string value)
+    {
+        for (char& c : value)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return value;
+    }
+
+    // Severity: AoE > Blast > Single. "random ..." maps to Single
+    // (enemy spread-targeting is not modeled — documented simplification).
+    int offenseSeverity(const std::string& skillsText)
+    {
+        std::string text = lowerCopy(skillsText);
+        if (text.find("all targets") != std::string::npos)
+            return 2;
+        if (text.find("adjacent") != std::string::npos)
+            return 1;
+        return 0;
+    }
+
+    std::string severityName(int severity)
+    {
+        if (severity >= 2)
+            return "AoE";
+        if (severity == 1)
+            return "Blast";
+        return "";
+    }
+
+    // Best-effort: fills offenseTargetType by enemy id. Missing file or
+    // missing rows leave the Single fallback ("").
+    void overlayOffenseTargeting(const std::string& dataDir,
+                                 std::vector<EnemyInfo>& enemies,
+                                 const std::unordered_map<std::string, size_t>& idIndex)
+    {
+        std::ifstream file(dataDir + "/monsters_data.csv");
+        if (!file)
+            return;
+        std::string header;
+        if (!std::getline(file, header))
+            return;
+        // Strip UTF-8 BOM when present.
+        if (header.size() >= 3 &&
+            static_cast<unsigned char>(header[0]) == 0xEF &&
+            static_cast<unsigned char>(header[1]) == 0xBB &&
+            static_cast<unsigned char>(header[2]) == 0xBF)
+            header = header.substr(3);
+        std::vector<std::string> headerCols = splitCsvRow(header);
+        int idCol = -1, skillsCol = -1;
+        for (size_t i = 0; i < headerCols.size(); ++i)
+        {
+            std::string name = lowerCopy(trim(headerCols[i]));
+            if (name == "id")
+                idCol = static_cast<int>(i);
+            else if (name == "skills")
+                skillsCol = static_cast<int>(i);
+        }
+        if (idCol < 0 || skillsCol < 0)
+            return;
+        std::string line;
+        // NOTE: embedded newlines inside quoted fields would break line
+        // iteration; the skills text is long but single-line per row in
+        // this export. Rows that fail to parse keep the fallback.
+        while (std::getline(file, line))
+        {
+            if (line.empty())
+                continue;
+            std::vector<std::string> cols = splitCsvRow(line);
+            if (static_cast<int>(cols.size()) <= std::max(idCol, skillsCol))
+                continue;
+            auto it = idIndex.find(trim(cols[static_cast<size_t>(idCol)]));
+            if (it == idIndex.end())
+                continue;
+            int severity = offenseSeverity(cols[static_cast<size_t>(skillsCol)]);
+            if (severity > 0)
+                enemies[it->second].offenseTargetType = severityName(severity);
+        }
+    }
+
     std::string trim(std::string value)
     {
         const auto notSpace = [](unsigned char c)
@@ -416,6 +536,9 @@ bool EnemyDatabase::load(const std::string& dataDir)
         idIndex[enemy.id] = enemies.size();
         enemies.push_back(std::move(enemy));
     }
+
+    // Phase 4.1: offense targeting overlay (best-effort, Single fallback).
+    overlayOffenseTargeting(dataDir, enemies, idIndex);
 
     TraceLog(LOG_INFO, "Loaded %zu enemies", enemies.size());
     return !enemies.empty();

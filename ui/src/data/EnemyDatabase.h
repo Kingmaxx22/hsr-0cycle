@@ -30,6 +30,12 @@ struct EnemyInfo
     std::vector<std::string> weaknesses;
     std::unordered_map<std::string, double> resistances;
 
+    // Phase 4.1: offense targeting parsed from monsters_data.csv skill
+    // text ("to all targets" -> AoE, "adjacent" -> Blast, else Single).
+    // "" = Single fallback. Most severe skill wins (enemies alternate
+    // attacks in game; no rotation model here — documented simplification).
+    std::string offenseTargetType;
+
     bool isBossOrElite() const { return isBoss || isElite; }
 };
 

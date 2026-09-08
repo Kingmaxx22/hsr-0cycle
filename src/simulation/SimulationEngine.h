@@ -13,7 +13,8 @@ namespace hsr {
 
 // Represents a single action in the timeline
 struct SplashHit {
-    std::string enemyId;  // Adjacent/AoE/bounce target hit by splash
+    std::string enemyId;  // Adjacent/AoE/bounce target hit by splash.
+        // For enemy offense ("EnemyAtk") this holds the ALLY id hit.
     int damageDealt = 0;  // Final damage on this target
     float breakDamage = 0.0f;
 };
@@ -180,6 +181,10 @@ struct EnemyConfig {
     // Enemy action damage multiplier (documented fallback 1.0; per-enemy
     // action data arrives with future enemy-data work).
     double actionMultiplier = 1.0;
+    // Phase 4.1: offense targeting ("" = Single fallback, "Blast", "AoE").
+    // Blast = primary + team-order-adjacent allies at full damage
+    // (no adjacent-mult data exists); AoE = all living allies.
+    std::string offenseTargetType;
     // Multi-layered toughness (wiki): non-empty = successive bars; only the
     // final bar triggers full break effects. Empty = legacy single bar.
     // No data source yet (monsters_rules.json has one toughness value).

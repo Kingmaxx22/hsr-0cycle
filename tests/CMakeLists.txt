@@ -29,6 +29,22 @@ hsr_add_test(test_multitarget
     ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
 )
 
+# Phase 4.1: enemy offense targeting (DB overlay + engine splash).
+# NOTE: provides its own no-op TraceLog (see test TU); do NOT link raylib.
+hsr_add_test(test_enemyaoe
+    test_enemyaoe.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/EnemyDatabase.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
+    ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
+)
+# EnemyDatabase uses raylib's TraceLog, so this test links the vendored
+# raylib (no new dependency). No other test needs it.
+target_include_directories(test_enemyaoe PRIVATE ${CMAKE_SOURCE_DIR}/raylib/src)
+target_link_libraries(test_enemyaoe PRIVATE raylib)
+if(WIN32)
+    target_link_libraries(test_enemyaoe PRIVATE winmm gdi32 opengl32)
+endif()
+
 # Phase 2: traces + LC passive opt-ins and resolver notes.
 hsr_add_test(test_passives
     test_passives.cpp
