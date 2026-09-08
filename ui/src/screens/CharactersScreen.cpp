@@ -73,11 +73,12 @@ Rectangle CharactersScreen::dotFieldBounds(int index) const
 Rectangle CharactersScreen::extraFieldBounds(int index) const
 {
     // Other bonuses: 5 cols x 2 rows at right; base override: 4-in-a-row.
+    // Rows sit below the subtitle line (modeContentY + 25).
     if (index < 10)
     {
         int col = index % 5;
         int row = index / 5;
-        return Rectangle{720.0f + col * 132.0f, 554.0f + row * 44.0f, 120.0f, 28.0f};
+        return Rectangle{720.0f + col * 132.0f, 584.0f + row * 44.0f, 120.0f, 28.0f};
     }
     int col = index - 10;
     return Rectangle{720.0f + col * 160.0f, 720.0f, 140.0f, 28.0f};
@@ -1336,21 +1337,24 @@ void CharactersScreen::draw()
 
         int summaryY = static_cast<int>(manualFieldBounds(9).y + 38.0f);
         const auto& mc = (manualIt != m_manualConfigs.end()) ? manualIt->second : ManualConfig{};
+        // Single summary line: leaves room below for the BREAK DOT row
+        // before the bottom selection prompt (900px window).
         std::string summary = "Manual: HP " + std::to_string(mc.hp) +
             " ATK " + std::to_string(mc.atk) +
             " DEF " + std::to_string(mc.def) +
-            " SPD " + std::to_string(mc.spd);
-        DrawText(summary.c_str(), 310, summaryY, 13, YELLOW);
-        std::string summary2 = "CRIT " + std::to_string(static_cast<int>(mc.critRate * 100.0)) +
+            " SPD " + std::to_string(mc.spd) +
+            " | CRIT " + std::to_string(static_cast<int>(mc.critRate * 100.0)) +
             "%/" + std::to_string(static_cast<int>(mc.critDmg * 100.0)) +
             "% DMG " + std::to_string(static_cast<int>(mc.elemDmg * 100.0)) +
             "% PEN " + std::to_string(static_cast<int>(mc.resPen * 100.0)) +
             "% EHR " + std::to_string(static_cast<int>(mc.ehr * 100.0)) + "%";
-        DrawText(summary2.c_str(), 310, summaryY + 18, 13, YELLOW);
+        DrawText(summary.c_str(), 310, summaryY, 13, YELLOW);
 
-        // Break-DoT configuration fields (Sec 4.2).
-        DrawText("BREAK DOT", 310, static_cast<int>(dotFieldBounds(0).y - 18), 14, ORANGE);
-        const char* dotLabels[kDotFieldCount] = {"Type", "Turns", "ATK Scale"};
+        // Break-DoT configuration fields (Sec 4.2). Legend folds into the
+        // caption so no extra hint row collides with the footer prompt.
+        DrawText("BREAK DOT - Type / Turns / ATK Scale (Burn, Shock, Bleed, WindShear; blank = none)",
+                 310, static_cast<int>(dotFieldBounds(0).y - 18), 14, ORANGE);
+        const char* dotLabels[kDotFieldCount] = {"Type", "Turns", "Scale"};
         for (int i = 0; i < kDotFieldCount; ++i)
         {
             Rectangle field = dotFieldBounds(i);
@@ -1367,8 +1371,6 @@ void CharactersScreen::draw()
                      static_cast<int>(field.y + 6), 14,
                      m_dotTexts[static_cast<size_t>(i)].empty() && !focused ? GRAY : RAYWHITE);
         }
-        DrawText("(Burn, Shock, Bleed, WindShear; 0 = none)", 310,
-                 static_cast<int>(dotFieldBounds(0).y + 34), 11, GRAY);
     }
 
     // --- Selection prompt (input itself is handled in update()) ---

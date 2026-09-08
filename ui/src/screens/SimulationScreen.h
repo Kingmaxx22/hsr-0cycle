@@ -65,6 +65,9 @@ private:
     void drawControls();
     void drawResults();
     void drawActionTooltip(const hsr::ActionEvent& action);
+    // Screen box of one timeline event (zoom/scroll aware). Shared by
+    // draw + hover hit-testing so the tooltip always matches the box.
+    Rectangle actionBox(size_t index);
     
     // State management
     void resetSimulation();

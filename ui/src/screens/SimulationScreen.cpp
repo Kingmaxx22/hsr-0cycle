@@ -165,6 +165,25 @@ void SimulationScreen::runSimulation() {
     std::cout << "  - Total Actions: " << lastResult.totalActions << std::endl;
     std::cout << "  - Total Damage: " << lastResult.totalDamage << std::endl;
     std::cout << "  - Timeline entries: " << lastResult.timeline.size() << std::endl;
+    // Console action log: one line per event so dense timelines stay
+    // readable even when the boxes overlap on screen.
+    for (size_t i = 0; i < lastResult.timeline.size(); ++i) {
+        const auto& ev = lastResult.timeline[i];
+        std::cout << "    [" << i << "] AV " << ev.currentAv
+                  << " " << ev.characterName << " " << ev.actionType;
+        if (!ev.targetEnemyId.empty())
+            std::cout << " -> " << ev.targetEnemyId;
+        if (!ev.targetAllyId.empty())
+            std::cout << " -> ally " << ev.targetAllyId;
+        std::cout << " dmg " << ev.damageDealt;
+        if (ev.breakDamage > 0.0f)
+            std::cout << " break " << static_cast<int>(ev.breakDamage);
+        if (!ev.debuffApplied.empty())
+            std::cout << " debuff " << ev.debuffApplied;
+        if (!ev.splashHits.empty())
+            std::cout << " splash x" << ev.splashHits.size();
+        std::cout << std::endl;
+    }
 }
 
 Rectangle SimulationScreen::headerBounds() {
@@ -191,7 +210,8 @@ Rectangle SimulationScreen::resultsBounds() {
 
 Rectangle SimulationScreen::characterSlotBounds(size_t index) {
     float startX = 50;
-    float startY = 80 + 300 + 20 + 80 + 20;
+    // Below the results panel (y 500 + 200 + 20), not overlapping it.
+    float startY = 80 + 300 + 20 + 80 + 20 + 200 + 20;
     float slotWidth = 200;
     float slotHeight = 60;
     float spacing = 10;
@@ -218,30 +238,29 @@ void SimulationScreen::update(float dt) {
         backRequested = true;
     }
 
-    // Handle mouse wheel for scrolling timeline
+    // Handle mouse wheel for scrolling timeline (horizontal pan; the
+    // content grows past the panel when zoomed in).
     float wheel = GetMouseWheelMove();
     if (wheel != 0) {
-        scrollOffset += static_cast<int>(wheel * 20);
-        scrollOffset = std::max(0, scrollOffset);
+        scrollOffset += static_cast<int>(wheel * 40);
+        Rectangle timelineRect = timelineBounds();
+        float contentW = timelineRect.width * zoomLevel + 40.0f * zoomLevel;
+        int minScroll = static_cast<int>(std::min(0.0f, timelineRect.width - contentW));
+        scrollOffset = std::clamp(scrollOffset, minScroll, 0);
     }
 
-    // Update hovered action index
+    // Update hovered action index by hit-testing the drawn boxes, so the
+    // tooltip always matches the box under the cursor.
     Rectangle timelineRect = timelineBounds();
     Vector2 mousePos = GetMousePosition();
 
+    hoveredActionIndex = -1;
     if (CheckCollisionPointRec(mousePos, timelineRect)) {
-        // Calculate which action is hovered
-        if (!lastResult.timeline.empty()) {
-            float actionWidth = 40 * zoomLevel;
-            float relativeX = mousePos.x - timelineRect.x - scrollOffset;
-            hoveredActionIndex = static_cast<int>(relativeX / actionWidth);
-
-            if (hoveredActionIndex < 0 || hoveredActionIndex >= static_cast<int>(lastResult.timeline.size())) {
-                hoveredActionIndex = -1;
+        for (size_t i = 0; i < lastResult.timeline.size(); ++i) {
+            if (CheckCollisionPointRec(mousePos, actionBox(i))) {
+                hoveredActionIndex = static_cast<int>(i);
             }
         }
-    } else {
-        hoveredActionIndex = -1;
     }
 }
 
@@ -288,6 +307,17 @@ void SimulationScreen::draw() {
     DrawText("Press R to Run | E to Toggle Engine | ESC to Reset", 50, GetScreenHeight() - 30, 16, GRAY);
 }
 
+Rectangle SimulationScreen::actionBox(size_t index) {
+    Rectangle rect = timelineBounds();
+    float actionWidth = 40 * zoomLevel;
+    // Zoom spreads events along the AV axis (zoom 1 = whole 150 AV window).
+    float pxPerAv = rect.width / 15000.0f * zoomLevel;
+    const auto& action = lastResult.timeline[index];
+    float x = rect.x + scrollOffset + static_cast<float>(action.currentAv) * pxPerAv - actionWidth / 2;
+    float y = rect.y + 40 + (index % 4) * 35; // Stagger multiple actions
+    return {x, y, actionWidth, 25};
+}
+
 void SimulationScreen::drawTimeline() {
     Rectangle rect = timelineBounds();
 
@@ -295,10 +325,17 @@ void SimulationScreen::drawTimeline() {
     DrawRectangleRec(rect, Fade(BLACK, 0.3f));
     DrawRectangleLinesEx(rect, 2, GRAY);
 
-    // Draw AV markers (0, 50, 100, 150)
-    float markerInterval = rect.width / 3.0f;
+    float pxPerAv = rect.width / 15000.0f * zoomLevel;
+
+    // Clip markers + boxes to the panel so zoomed content never bleeds.
+    BeginScissorMode(static_cast<int>(rect.x), static_cast<int>(rect.y),
+                     static_cast<int>(rect.width), static_cast<int>(rect.height));
+
+    // Draw AV markers (0, 50, 100, 150), following zoom/scroll.
     for (int i = 0; i <= 3; ++i) {
-        float x = rect.x + i * markerInterval;
+        float x = rect.x + scrollOffset + static_cast<float>(i * 5000) * pxPerAv;
+        if (x < rect.x - 60 || x > rect.x + rect.width + 10)
+            continue;
         DrawLineV({x, rect.y}, {x, rect.y + rect.height}, Fade(GRAY, 0.3f));
 
         std::string label = std::to_string(i * 50) + " AV";
@@ -306,22 +343,23 @@ void SimulationScreen::drawTimeline() {
     }
 
     // Draw 150 AV limit line
-    float limitX = rect.x + rect.width - 5;
-    DrawLineV({limitX, rect.y}, {limitX, rect.y + rect.height}, RED);
-    DrawText("150 AV Limit", limitX - 50, rect.y + rect.height - 20, 12, RED);
+    float limitX = rect.x + scrollOffset + rect.width * zoomLevel;
+    if (limitX >= rect.x && limitX <= rect.x + rect.width + 10) {
+        DrawLineV({limitX, rect.y}, {limitX, rect.y + rect.height}, RED);
+        DrawText("150 AV Limit", limitX - 90, rect.y + rect.height - 20, 12, RED);
+    }
 
     // Draw action timeline
     if (!lastResult.timeline.empty()) {
         float actionWidth = 40 * zoomLevel;
-        float spacing = 5;
 
         for (size_t i = 0; i < lastResult.timeline.size(); ++i) {
             const auto& action = lastResult.timeline[i];
-
-            // Calculate position based on AV
-            float avPercent = static_cast<float>(action.currentAv) / 15000.0f;
-            float x = rect.x + avPercent * rect.width - actionWidth / 2;
-            float y = rect.y + 40 + (i % 4) * 35; // Stagger multiple actions
+            Rectangle actionRect = actionBox(i);
+            float x = actionRect.x;
+            float y = actionRect.y;
+            if (x + actionWidth < rect.x || x > rect.x + rect.width)
+                continue;
 
             // Determine color based on action type
             Color actionColor = BLUE;
@@ -337,7 +375,6 @@ void SimulationScreen::drawTimeline() {
             else if (action.actionType == "Shield") actionColor = SKYBLUE;
 
             // Draw action box
-            Rectangle actionRect = {x, y, actionWidth, 25};
             DrawRectangleRec(actionRect, actionColor);
             DrawRectangleLinesEx(actionRect, 1, WHITE);
 
@@ -351,6 +388,7 @@ void SimulationScreen::drawTimeline() {
                 DrawRectangleLinesEx(actionRect, 3, YELLOW);
             }
         }
+        EndScissorMode();
     } else {
         // Show placeholder text
         const char* placeholder = "No simulation data - Press R to run";
@@ -360,7 +398,8 @@ void SimulationScreen::drawTimeline() {
 }
 
 void SimulationScreen::drawCharacterSlots() {
-    float startY = 80 + 300 + 20 + 80 + 20;
+    // Below the results panel (matches characterSlotBounds).
+    float startY = 80 + 300 + 20 + 80 + 20 + 200 + 20;
 
     DrawText("Characters:", 50, startY - 20, 18, WHITE);
 
@@ -494,11 +533,11 @@ void SimulationScreen::drawControls() {
     DrawText("+", zoomInBtn.x + 10, zoomInBtn.y + 10, 24, WHITE);
 
     if (CheckCollisionPointRec(GetMousePosition(), zoomOutBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        zoomLevel = std::max(0.5f, zoomLevel - 0.1f);
+        zoomLevel = std::max(0.5f, zoomLevel - 0.25f);
     }
 
     if (CheckCollisionPointRec(GetMousePosition(), zoomInBtn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        zoomLevel = std::min(2.0f, zoomLevel + 0.1f);
+        zoomLevel = std::min(4.0f, zoomLevel + 0.25f);
     }
 }
 
