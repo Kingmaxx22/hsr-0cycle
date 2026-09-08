@@ -28,3 +28,13 @@ hsr_add_test(test_multitarget
     ${CMAKE_SOURCE_DIR}/src/simulation/SimulationEngine.cpp
     ${CMAKE_SOURCE_DIR}/src/simulation/DamageCalculator.cpp
 )
+
+# Phase 2: traces + LC passive opt-ins and resolver notes.
+hsr_add_test(test_passives
+    test_passives.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/CharacterDatabase.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/SkillDatabase.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/LightConeDatabase.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/Relicsetdatabase.cpp
+    ${CMAKE_SOURCE_DIR}/ui/src/data/LoadoutResolver.cpp
+)

@@ -95,6 +95,13 @@ Rectangle CharactersScreen::toggleRowBounds(int index) const
     return Rectangle{310.0f, 780.0f + index * 24.0f, 390.0f, 22.0f};
 }
 
+Rectangle CharactersScreen::traceRowBounds(int index, int setRows) const
+{
+    // Header line occupies one 24px row after the set-toggle block.
+    float baseY = 780.0f + setRows * 24.0f + 28.0f + index * 40.0f;
+    return Rectangle{310.0f, baseY, 390.0f, 38.0f};
+}
+
 std::vector<CharactersScreen::CondToggle> CharactersScreen::conditionalToggles(
     const CharacterLoadout& lo) const
 {
@@ -414,6 +421,7 @@ void CharactersScreen::update(float dt)
                     // Q3 conditional set-effect opt-in toggles (max 3 drawn).
                     auto toggles = conditionalToggles(lo);
                     size_t shown = std::min(toggles.size(), static_cast<size_t>(3));
+                    bool rowHit = false;
                     for (size_t ti = 0; ti < shown; ++ti)
                     {
                         if (CheckCollisionPointRec(mouse, toggleRowBounds(static_cast<int>(ti))))
@@ -425,7 +433,26 @@ void CharactersScreen::update(float dt)
                                 bool& active = lo.setEffectActive[toggles[ti].effectId];
                                 active = !active;
                             }
+                            rowHit = true;
                             break;
+                        }
+                    }
+                    // Phase 2: major-trace opt-in toggles (manual, default
+                    // OFF; no numeric effect is inferred).
+                    if (!rowHit && selectedInfo() != nullptr)
+                    {
+                        const auto& traces = selectedInfo()->traces;
+                        size_t traceShown = std::min(traces.size(), static_cast<size_t>(3));
+                        for (size_t ti = 0; ti < traceShown; ++ti)
+                        {
+                            if (CheckCollisionPointRec(
+                                    mouse, traceRowBounds(static_cast<int>(ti),
+                                                          static_cast<int>(shown))))
+                            {
+                                bool& active = lo.traceActive[traces[ti].slot];
+                                active = !active;
+                                break;
+                            }
                         }
                     }
                 }
@@ -731,10 +758,10 @@ void CharactersScreen::draw()
 
             // Q3 conditional set-effect opt-ins (manual-only, default OFF).
             auto toggles = conditionalToggles(lo);
+            size_t shown = std::min(toggles.size(), static_cast<size_t>(3));
             if (!toggles.empty())
             {
                 DrawText("CONDITIONAL SET FX — opt-in, default OFF", 310, 760, 13, YELLOW);
-                size_t shown = std::min(toggles.size(), static_cast<size_t>(3));
                 for (size_t ti = 0; ti < shown; ++ti)
                 {
                     Rectangle row = toggleRowBounds(static_cast<int>(ti));
@@ -758,6 +785,42 @@ void CharactersScreen::draw()
                 {
                     std::string more = "+" + std::to_string(toggles.size() - shown) + " more";
                     DrawText(more.c_str(), 310, 780 + static_cast<int>(shown) * 24, 12, GRAY);
+                }
+            }
+
+            // Phase 2: major-trace opt-ins (manual-only, default OFF).
+            // Mechanics are not auto-resolved; the enabled set travels to
+            // the sim as informational notes.
+            const CharacterInfo* traceInfo = selectedInfo();
+            if (traceInfo != nullptr && !traceInfo->traces.empty())
+            {
+                size_t traceShown = std::min(traceInfo->traces.size(), static_cast<size_t>(3));
+                float traceHeaderY = 780.0f + static_cast<float>(shown) * 24.0f +
+                    (toggles.empty() ? 0.0f : 28.0f);
+                DrawText("MAJOR TRACES — opt-in, default OFF", 310,
+                         static_cast<int>(traceHeaderY), 13, YELLOW);
+                for (size_t ti = 0; ti < traceShown; ++ti)
+                {
+                    Rectangle row = traceRowBounds(static_cast<int>(ti),
+                                                  static_cast<int>(shown));
+                    const MajorTrace& trace = traceInfo->traces[ti];
+                    auto it = lo.traceActive.find(trace.slot);
+                    bool on = (it != lo.traceActive.end() && it->second);
+                    DrawRectangle(static_cast<int>(row.x), static_cast<int>(row.y + 3),
+                                  14, 14, on ? GREEN : DARKGRAY);
+                    if (on)
+                        DrawText("x", static_cast<int>(row.x + 3),
+                                 static_cast<int>(row.y + 2), 14, BLACK);
+                    std::string label = trace.slot + " " + trace.name;
+                    if (label.size() > 48)
+                        label = label.substr(0, 45) + "...";
+                    DrawText(label.c_str(), static_cast<int>(row.x + 22),
+                             static_cast<int>(row.y + 3), 13, on ? RAYWHITE : LIGHTGRAY);
+                    std::string desc = trace.description;
+                    if (desc.size() > 64)
+                        desc = desc.substr(0, 61) + "...";
+                    DrawText(desc.c_str(), static_cast<int>(row.x + 22),
+                             static_cast<int>(row.y + 21), 11, GRAY);
                 }
             }
 

@@ -125,6 +125,9 @@ private:
     };
     std::vector<CondToggle> conditionalToggles(const CharacterLoadout& lo) const;
     Rectangle toggleRowBounds(int index) const;
+    // Phase 2: major-trace toggle rows sit below the set-effect rows.
+    // setRows = number of drawn set-toggle rows (0..3).
+    Rectangle traceRowBounds(int index, int setRows) const;
 
     // Layout constants
     static constexpr int kLibraryCols = 5;

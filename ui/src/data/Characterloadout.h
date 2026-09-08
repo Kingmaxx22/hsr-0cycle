@@ -82,6 +82,13 @@ struct CharacterLoadout
     // each bonus. Missing key also means false.
     std::unordered_map<std::string, bool> setEffectActive;
 
+    // Phase 2: major-trace opt-ins (slot "A2"/"A4"/"A6" -> active, default
+    // false) and Light Cone passive opt-in (default false). Mechanics are
+    // NOT auto-resolved (§29): the enabled set travels to the sim as
+    // informational notes; numeric resolution comes later.
+    std::unordered_map<std::string, bool> traceActive;
+    bool lcPassiveActive = false;
+
     bool initialized = false;
 };
 

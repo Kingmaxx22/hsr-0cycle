@@ -58,6 +58,10 @@ struct CharacterConfig {
     int level = 80;         // Attacker level for the DEF formula (Sec 4)
     std::string element;    // Attacker element for per-element RES (Q2); "" = type-bucket fallback
     std::string speedNotes; // Character-specific speed/AV exception notes (informational only)
+    // Phase 2: manually enabled passives (traces, LC passive) as
+    // informational notes (same precedent as speedNotes). No numeric
+    // effect is inferred from these; resolution comes later.
+    std::vector<std::string> passiveNotes;
 
     // Base stats from character data (before LC/relic bonuses)
     double baseHp = 0.0;

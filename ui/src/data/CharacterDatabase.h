@@ -23,15 +23,23 @@ struct SkillTuning
     std::string scalingStat;
 };
 
+struct MajorTrace
+{
+    std::string slot;       // "A2", "A4", "A6"
+    std::string name;
+    std::string description;
+};
+
 struct CharacterInfo
 {
-    std::string id;        // "acheron" — used for both rules lookup and artwork
+    std::string id;        // "acheron" - used for both rules lookup and artwork
     std::string name;
     int rarity = 0;
     std::string element;
     std::string path;      // HSR "Path" (Nihility, Harmony, etc.)
     std::unordered_map<std::string, double> baseStats;
     std::unordered_map<std::string, SkillTuning> skills; // keys: basic/skill/ult/fua/memosprite
+    std::vector<MajorTrace> traces; // A2/A4/A6, file order (Phase 2)
 };
 
 class CharacterDatabase

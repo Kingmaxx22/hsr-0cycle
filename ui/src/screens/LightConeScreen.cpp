@@ -338,6 +338,14 @@ void LightConeScreen::update(float dt)
             if (CheckCollisionPointRec(mouse, unequipBtn))
             {
                 loadout.lightConeId.clear();
+                loadout.lcPassiveActive = false;
+            }
+
+            // Phase 2: LC passive opt-in toggle.
+            Rectangle passiveToggle{330.0f, 700.0f, 340.0f, 22.0f};
+            if (CheckCollisionPointRec(mouse, passiveToggle))
+            {
+                loadout.lcPassiveActive = !loadout.lcPassiveActive;
             }
         }
 
@@ -532,12 +540,25 @@ void LightConeScreen::drawEquippedPanel()
     DrawLine(330, 430, 670, 430, Color{45, 48, 60, 255});
     DrawText("PASSIVE EFFECT", 330, 442, 13, kDimText);
 
-    Rectangle descBox{330.0f, 465.0f, 340.0f, 250.0f};
+    Rectangle descBox{330.0f, 465.0f, 340.0f, 228.0f};
     DrawRectangleRounded(descBox, 0.05f, 6, Color{22, 24, 32, 255});
     DrawRectangleRoundedLines(descBox, 0.05f, 6, Color{40, 44, 55, 255});
 
     std::string effect = lc->effectDescription.empty() ? "No passive effect description available." : lc->effectDescription;
     drawWrappedText(effect, descBox.x + 12.0f, descBox.y + 10.0f, descBox.width - 24.0f, descBox.height - 20.0f, 13, Color{210, 215, 225, 255}, 4.0f);
+
+    // Phase 2: LC passive opt-in (manual, default OFF). The enabled
+    // passive travels to the sim as an informational note; its numeric
+    // effect is not auto-resolved (§29).
+    Rectangle passiveToggle{330.0f, 700.0f, 340.0f, 22.0f};
+    DrawRectangle(static_cast<int>(passiveToggle.x), static_cast<int>(passiveToggle.y + 3),
+                  14, 14, loadout.lcPassiveActive ? GREEN : DARKGRAY);
+    if (loadout.lcPassiveActive)
+        DrawText("x", static_cast<int>(passiveToggle.x + 3),
+                 static_cast<int>(passiveToggle.y + 2), 14, BLACK);
+    DrawText("Passive active (manual opt-in)", static_cast<int>(passiveToggle.x + 22),
+             static_cast<int>(passiveToggle.y + 3), 13,
+             loadout.lcPassiveActive ? RAYWHITE : LIGHTGRAY);
 
     // Unequip button
     Rectangle unequipBtn{330.0f, 730.0f, 340.0f, 34.0f};

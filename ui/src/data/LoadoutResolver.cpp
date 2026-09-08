@@ -370,6 +370,23 @@ void applyToCharacterConfig(hsr::CharacterConfig& config,
     config.breakEffect = b.breakEffect;
     config.outgoingHealingBoost = b.healingBoost;
     config.energyRegen = b.energyRegen;
+
+    // Phase 2: manually enabled passives travel as informational notes
+    // (§29: no numeric effect inferred). Trace names come from the DB.
+    config.passiveNotes.clear();
+    for (const auto& trace : info.traces)
+    {
+        auto it = loadout.traceActive.find(trace.slot);
+        if (it != loadout.traceActive.end() && it->second)
+            config.passiveNotes.push_back("Trace " + trace.slot + " " +
+                                          trace.name + ": ON");
+    }
+    if (loadout.lcPassiveActive && !loadout.lightConeId.empty())
+    {
+        const LightConeInfo* lc = lightCones.getById(loadout.lightConeId);
+        std::string lcName = (lc != nullptr) ? lc->name : loadout.lightConeId;
+        config.passiveNotes.push_back("LC passive " + lcName + ": ON");
+    }
 }
 
 void applyManualToCharacterConfig(hsr::CharacterConfig& config,

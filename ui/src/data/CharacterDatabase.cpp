@@ -4,6 +4,7 @@
 
 #include <cstdio>
 #include <fstream>
+#include <unordered_map>
 
 using json = nlohmann::json;
 
@@ -46,6 +47,64 @@ bool CharacterDatabase::load(const std::string& dataDir)
     // character below. Best-effort: missing file leaves engine fallbacks.
     SkillDatabase skillDb;
     const bool haveSkills = skillDb.load(dataDir);
+
+    // Phase 2: major-trace passives, loaded once and attached by slug.
+    // Best-effort: missing file leaves empty trace lists.
+    std::unordered_map<std::string, std::vector<MajorTrace>> tracesBySlug;
+    {
+        std::ifstream traceFile(dataDir + "/character_major_traces_rules.json");
+        if (traceFile)
+        {
+            try
+            {
+                json traceRoot;
+                traceFile >> traceRoot;
+                if (traceRoot.contains("traces") && traceRoot["traces"].is_array())
+                {
+                    for (const auto& entry : traceRoot["traces"])
+                    {
+                        if (!entry.contains("raw") || !entry["raw"].is_object())
+                            continue;
+                        const json& raw = entry["raw"];
+                        std::string slug = raw.value("slug", "");
+                        if (slug.empty())
+                            continue;
+                        MajorTrace trace;
+                        trace.slot = raw.value("trace_type", "");
+                        // Display-name heuristic (display only; mechanics
+                        // unaffected): trace_name is the generic "Major
+                        // trace", so the real name is the leading Title-Case
+                        // phrase of the description ("Red Oni When ...").
+                        // Split before the first clause keyword.
+                        std::string desc = raw.value("description", "");
+                        static const char* markers[] = {
+                            " When ", " While ", " If ", " After ", " At ",
+                            " During ", " For ", " Increases ", " Whenever ",
+                            " Gains ", nullptr
+                        };
+                        size_t cut = std::string::npos;
+                        for (int mi = 0; markers[mi] != nullptr; ++mi)
+                        {
+                            size_t pos = desc.find(markers[mi]);
+                            if (pos != std::string::npos &&
+                                (cut == std::string::npos || pos < cut))
+                                cut = pos;
+                        }
+                        if (cut != std::string::npos && cut > 0 && cut < 48)
+                            trace.name = desc.substr(0, cut);
+                        else
+                            trace.name = trace.slot;
+                        trace.description = desc;
+                        tracesBySlug[slug].push_back(std::move(trace));
+                    }
+                }
+            }
+            catch (const json::parse_error& e)
+            {
+                fprintf(stderr, "Failed to parse traces: %s\n", e.what());
+            }
+        }
+    }
 
     for (const auto& rec : root["characters"])
     {
@@ -101,6 +160,10 @@ bool CharacterDatabase::load(const std::string& dataDir)
 
         if (info.id.empty())
             continue;
+
+        auto traceIt = tracesBySlug.find(info.id);
+        if (traceIt != tracesBySlug.end())
+            info.traces = traceIt->second;
 
         idIndex[info.id] = characters.size();
         characters.push_back(std::move(info));
