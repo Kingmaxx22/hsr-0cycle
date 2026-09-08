@@ -1,0 +1,16 @@
+character_file,path_id,dot_base_chance,raw_expr,literal
+Asta,1000,0.80,0.80,True
+Himeko,1000,0.50,0.50,True
+KafkaB1,1000,1.00,1.00,True
+BlackSwanB1,1300,,dotChance,False
+Jiaoqiu,1200,1.0,1.0,True
+Guinaifen,1200,,dotChance,False
+Hysilens,1400,1.0,1.0,True
+Hysilens,1400,1.0,1.0,True
+Hysilens,1400,1.0,1.0,True
+Hysilens,1400,1.0,1.0,True
+Hysilens,1400,1.0,1.0,True
+Luka,1100,1.00,1.00,True
+Serval,1100,1.0,1.0,True
+Hook,1100,1.00,1.00,True
+Sampo,1100,0.65,0.65,True
